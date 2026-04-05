@@ -1,0 +1,94 @@
+@model SecurityPatrol.Web.ViewModels.AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="page-header">
+    <div class="container">
+        <h2 class="mb-0"><i class="fas fa-cogs me-2"></i>Admin Dashboard</h2>
+        <small class="opacity-75">DRH Security Patrol Management</small>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row g-3 mb-5">
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm h-100">
+                <div class="card-body py-4">
+                    <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                    <div class="fs-3 fw-bold text-primary">@Model.TotalUsers</div>
+                    <div class="small text-muted">Total Users</div>
+                    <div class="small text-muted">(@Model.ActiveOfficers active officers)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm h-100">
+                <div class="card-body py-4">
+                    <i class="fas fa-building fa-2x text-info mb-2"></i>
+                    <div class="fs-3 fw-bold text-info">@Model.TotalBuildings</div>
+                    <div class="small text-muted">Buildings</div>
+                    <div class="small text-muted">(@Model.TotalLocations locations)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm h-100">
+                <div class="card-body py-4">
+                    <i class="fas fa-walking fa-2x text-success mb-2"></i>
+                    <div class="fs-3 fw-bold text-success">@Model.PatrolsToday</div>
+                    <div class="small text-muted">Patrols Today</div>
+                    <div class="small text-muted">(@Model.ScheduledPatrolsToday scheduled)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm h-100 @(Model.MissedLocationsToday > 0 ? "border-danger" : "")">
+                <div class="card-body py-4">
+                    <i class="fas fa-exclamation-triangle fa-2x @(Model.MissedLocationsToday > 0 ? "text-danger" : "text-muted") mb-2"></i>
+                    <div class="fs-3 fw-bold @(Model.MissedLocationsToday > 0 ? "text-danger" : "text-muted")">@Model.MissedLocationsToday</div>
+                    <div class="small text-muted">Missed Today</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        @{
+            var sections = new[]
+            {
+                new { Icon = "fas fa-building", Title = "Site Admin", Desc = "Manage buildings, floors, and scan locations", Link = "/SiteAdmin", Color = "text-info" },
+                new { Icon = "fas fa-users", Title = "User Admin", Desc = "Create and manage officer and auditor accounts", Link = "/Admin/Users", Color = "text-primary" },
+                new { Icon = "fas fa-calendar-alt", Title = "Schedules", Desc = "Create and manage patrol schedules", Link = "/Admin/Schedules", Color = "text-success" },
+                new { Icon = "fas fa-route", Title = "Patrol Routes", Desc = "Define patrol routes and location order", Link = "/Admin/Routes", Color = "text-warning" },
+                new { Icon = "fas fa-qrcode", Title = "QR Codes", Desc = "Generate and print QR codes for locations", Link = "/Admin/QrCodes", Color = "text-dark" },
+                new { Icon = "fas fa-bell", Title = "Messages", Desc = "Post messages visible to all officers", Link = "/Admin/Messages", Color = "text-danger" },
+                new { Icon = "fas fa-search", Title = "Audit", Desc = "Review missed locations and patrol compliance", Link = "/Audit", Color = "text-secondary" },
+                new { Icon = "fas fa-chart-bar", Title = "Reports", Desc = "Patrol history and role-based reports", Link = "/Report", Color = "text-primary" }
+            };
+        }
+        @foreach (var s in sections)
+        {
+            <div class="col-md-3 col-6">
+                <a href="@s.Link" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm admin-card" style="transition: transform 0.15s;">
+                        <div class="card-body text-center py-4">
+                            <i class="@s.Icon fa-2x @s.Color mb-3"></i>
+                            <h6 class="fw-bold mb-1">@s.Title</h6>
+                            <p class="small text-muted mb-0">@s.Desc</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.admin-card').forEach(function(card) {
+            card.addEventListener('mouseenter', function() { this.style.transform = 'translateY(-4px)'; });
+            card.addEventListener('mouseleave', function() { this.style.transform = 'translateY(0)'; });
+        });
+    </script>
+}

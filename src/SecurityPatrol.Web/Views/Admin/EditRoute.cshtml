@@ -1,0 +1,248 @@
+@model SecurityPatrol.Web.ViewModels.EditRouteViewModel
+@{
+    ViewData["Title"] = "Edit Route";
+}
+
+<div class="page-header">
+    <div class="container">
+        <h2 class="mb-0"><i class="fas fa-route me-2"></i>Edit Route: @Model.Form.Name</h2>
+        <small class="opacity-75">Drag to reorder locations in the patrol sequence</small>
+    </div>
+</div>
+
+<div class="container">
+    <form method="post" asp-action="SaveRoute" id="routeForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.Form.Id" />
+        <input type="hidden" name="locationOrder" id="locationOrder" />
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header" style="background:#003087; color:white;">
+                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Route Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Route Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" required value="@Model.Form.Name" maxlength="200" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Description</label>
+                            <textarea name="description" class="form-control" rows="3" maxlength="1000">@Model.Form.Description</textarea>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" name="isActive" class="form-check-input" value="true" id="isActiveCheck" @(Model.Form.IsActive ? "checked" : "") />
+                            <label class="form-check-label" for="isActiveCheck">Active</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header" style="background:#003087; color:white;">
+                        <h6 class="mb-0"><i class="fas fa-plus me-2"></i>Add Location</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Filter by Building</label>
+                            <select id="buildingFilter" class="form-select form-select-sm">
+                                <option value="">All Buildings</option>
+                                @foreach (var b in Model.Buildings)
+                                {
+                                    <option value="@b.Id">@b.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Location</label>
+                            <select id="locationSelect" class="form-select form-select-sm">
+                                <option value="">-- Select --</option>
+                                @foreach (var l in Model.AllLocations)
+                                {
+                                    <option value="@l.Id" data-building="@l.BuildingId" data-name="@l.Name" data-floor="@(l.Floor?.Name ?? "")" data-buildingname="@l.Building.Name">
+                                        @l.Name (@l.Building.Name@(l.Floor != null ? $" / {l.Floor.Name}" : ""))
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-success btn-sm w-100" id="addLocationBtn">
+                            <i class="fas fa-plus me-1"></i>Add to Route
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm w-100 mt-2" id="addAllLocationsBtn">
+                            <i class="fas fa-list-check me-1"></i>Add All Visible Locations
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center" style="background:#003087; color:white;">
+                        <h6 class="mb-0"><i class="fas fa-list-ol me-2"></i>Route Locations (drag to reorder)</h6>
+                        <span class="badge bg-light text-dark" id="locationCount">@Model.Form.Locations.Count</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="sortableList" class="list-group list-group-flush">
+                            @foreach (var loc in Model.Form.Locations.OrderBy(l => l.OrderIndex))
+                            {
+                                <div class="list-group-item d-flex align-items-center" data-id="@loc.LocationId">
+                                    <i class="fas fa-grip-vertical text-muted me-3 drag-handle" style="cursor:grab;"></i>
+                                    <div class="flex-grow-1">
+                                        <span class="fw-semibold">@loc.LocationName</span>
+                                        <small class="text-muted ms-2">@loc.BuildingName @(loc.FloorName != null ? $"/ {loc.FloorName}" : "")</small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger remove-location">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                        @if (!Model.Form.Locations.Any())
+                        {
+                            <div id="emptyMessage" class="text-center py-4 text-muted">
+                                <i class="fas fa-map-marker-alt fa-2x mb-2 opacity-25"></i>
+                                <p class="small">No locations added yet. Add locations using the panel on the left.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a asp-action="Routes" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Routes
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">
+                        <i class="fas fa-save me-1"></i>Save Route
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script>
+        var sortable = new Sortable(document.getElementById('sortableList'), {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'bg-light'
+        });
+
+        function updateLocationOrder() {
+            var items = document.querySelectorAll('#sortableList [data-id]');
+            var ids = Array.from(items).map(function(el) { return el.dataset.id; });
+            document.getElementById('locationOrder').value = ids.join(',');
+            document.getElementById('locationCount').textContent = ids.length;
+        }
+
+        document.getElementById('sortableList').addEventListener('sortupdate', updateLocationOrder);
+
+        document.querySelectorAll('.remove-location').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                this.closest('.list-group-item').remove();
+                updateLocationOrder();
+                checkEmpty();
+            });
+        });
+
+        function checkEmpty() {
+            var items = document.querySelectorAll('#sortableList [data-id]');
+            var emptyMsg = document.getElementById('emptyMessage');
+            if (emptyMsg) {
+                emptyMsg.style.display = items.length === 0 ? '' : 'none';
+            }
+        }
+
+        document.getElementById('addLocationBtn').addEventListener('click', function() {
+            var select = document.getElementById('locationSelect');
+            var opt = select.options[select.selectedIndex];
+            if (!opt.value) return;
+
+            var existing = document.querySelector('#sortableList [data-id="' + opt.value + '"]');
+            if (existing) { alert('Location already in route.'); return; }
+
+            var item = document.createElement('div');
+            item.className = 'list-group-item d-flex align-items-center';
+            item.dataset.id = opt.value;
+            item.innerHTML = '<i class="fas fa-grip-vertical text-muted me-3 drag-handle" style="cursor:grab;"></i>' +
+                '<div class="flex-grow-1">' +
+                '<span class="fw-semibold">' + opt.dataset.name + '</span>' +
+                '<small class="text-muted ms-2">' + opt.dataset.buildingname + (opt.dataset.floor ? ' / ' + opt.dataset.floor : '') + '</small>' +
+                '</div>' +
+                '<button type="button" class="btn btn-sm btn-outline-danger remove-location"><i class="fas fa-times"></i></button>';
+
+            item.querySelector('.remove-location').addEventListener('click', function() {
+                this.closest('.list-group-item').remove();
+                updateLocationOrder();
+                checkEmpty();
+            });
+
+            document.getElementById('sortableList').appendChild(item);
+            updateLocationOrder();
+            checkEmpty();
+        });
+
+        document.getElementById('addAllLocationsBtn').addEventListener('click', function() {
+            var locationSelect = document.getElementById('locationSelect');
+            var buildingFilter = document.getElementById('buildingFilter');
+            var buildingName = buildingFilter.value
+                ? buildingFilter.options[buildingFilter.selectedIndex].text
+                : 'all buildings';
+
+            var visibleOptions = Array.from(locationSelect.options).filter(function(opt) {
+                return opt.value !== '' && !opt.hidden;
+            });
+
+            var toAdd = visibleOptions.filter(function(opt) {
+                return !document.querySelector('#sortableList [data-id="' + opt.value + '"]');
+            });
+
+            if (toAdd.length === 0) {
+                alert('All visible locations are already in the route.');
+                return;
+            }
+
+            if (!confirm('Add all ' + toAdd.length + ' location(s) from ' + buildingName + ' to this route?')) {
+                return;
+            }
+
+            toAdd.forEach(function(opt) {
+                var item = document.createElement('div');
+                item.className = 'list-group-item d-flex align-items-center';
+                item.dataset.id = opt.value;
+                item.innerHTML = '<i class="fas fa-grip-vertical text-muted me-3 drag-handle" style="cursor:grab;"></i>' +
+                    '<div class="flex-grow-1">' +
+                    '<span class="fw-semibold">' + opt.dataset.name + '</span>' +
+                    '<small class="text-muted ms-2">' + opt.dataset.buildingname + (opt.dataset.floor ? ' / ' + opt.dataset.floor : '') + '</small>' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger remove-location"><i class="fas fa-times"></i></button>';
+
+                item.querySelector('.remove-location').addEventListener('click', function() {
+                    this.closest('.list-group-item').remove();
+                    updateLocationOrder();
+                    checkEmpty();
+                });
+
+                document.getElementById('sortableList').appendChild(item);
+            });
+
+            updateLocationOrder();
+            checkEmpty();
+        });
+
+        document.getElementById('buildingFilter').addEventListener('change', function() {
+            var buildingId = this.value;
+            var locationSelect = document.getElementById('locationSelect');
+            Array.from(locationSelect.options).forEach(function(opt) {
+                opt.hidden = buildingId && opt.dataset.building !== buildingId && opt.value !== '';
+            });
+        });
+
+        document.getElementById('routeForm').addEventListener('submit', function() {
+            updateLocationOrder();
+        });
+
+        updateLocationOrder();
+    </script>
+}

@@ -1,0 +1,106 @@
+@model SecurityPatrol.Web.ViewModels.AuditorDashboardViewModel
+@{
+    ViewData["Title"] = "Audit - Missed Locations";
+}
+
+<div class="page-header">
+    <div class="container">
+        <h2 class="mb-0"><i class="fas fa-search me-2"></i>Missed Location Audit</h2>
+        <small class="opacity-75">Review locations not scanned during scheduled walks</small>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row g-4">
+        <div class="col-md-3">
+            <div class="sidebar">
+                <h6 class="fw-bold mb-3"><i class="fas fa-filter me-2 text-primary"></i>Filters</h6>
+                <form method="get">
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Building</label>
+                        <select name="buildingId" class="form-select form-select-sm">
+                            <option value="">All Buildings</option>
+                            @foreach (var b in Model.Buildings)
+                            {
+                                <option value="@b.Id" selected="@(Model.FilterBuildingId == b.Id)">@b.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Officer</label>
+                        <select name="officerId" class="form-select form-select-sm">
+                            <option value="">All Officers</option>
+                            @foreach (var o in Model.Officers)
+                            {
+                                <option value="@o.Id" selected="@(Model.FilterOfficerId == o.Id)">@o.FullName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">From Date</label>
+                        <input type="date" name="fromDate" class="form-control form-control-sm"
+                               value="@Model.FilterFromDate?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">To Date</label>
+                        <input type="date" name="toDate" class="form-control form-control-sm"
+                               value="@Model.FilterToDate?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-search me-1"></i>Search
+                    </button>
+                    <a href="/Audit" class="btn btn-outline-secondary btn-sm w-100 mt-2">Clear</a>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background:#003087; color:white;">
+                    <h6 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Missed Locations
+                        <span class="badge @(Model.MissedLocationCount > 0 ? "bg-danger" : "bg-success") ms-2">@Model.MissedLocationCount</span>
+                    </h6>
+                    <a href="/Audit/WalkHistory" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-history me-1"></i>Full History
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.MissedLocations.Any())
+                    {
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Scheduled Date</th>
+                                    <th>Officer</th>
+                                    <th>Route</th>
+                                    <th>Missed Location</th>
+                                    <th>Building / Floor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.MissedLocations)
+                                {
+                                    <tr>
+                                        <td>@item.ScheduledDate.ToString("MM/dd/yyyy")</td>
+                                        <td class="fw-semibold small">@item.OfficerName</td>
+                                        <td class="small">@item.RouteName</td>
+                                        <td><span class="badge bg-danger">@item.LocationName</span></td>
+                                        <td class="small text-muted">@item.BuildingName / @item.FloorName</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-check-circle fa-3x mb-3 text-success opacity-50"></i>
+                            <p class="mb-0">No missed locations found for the selected criteria.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

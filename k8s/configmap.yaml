@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-patrol-config
+  namespace: security-patrol
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  AppSettings__PhotoUploadPath: "wwwroot/uploads"
+  AppSettings__MaxPhotoSizeMB: "5"
+  Logging__LogLevel__Default: "Information"
+  Logging__LogLevel__Microsoft.AspNetCore: "Warning"

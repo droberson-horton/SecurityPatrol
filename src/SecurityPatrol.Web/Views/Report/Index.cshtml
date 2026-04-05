@@ -1,0 +1,89 @@
+@model SecurityPatrol.Web.ViewModels.ReportIndexViewModel
+@{
+    ViewData["Title"] = "Reports";
+}
+
+<div class="page-header">
+    <div class="container">
+        <h2 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Reports</h2>
+        <small class="opacity-75">Security patrol analytics and reporting</small>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row g-3 mb-5">
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-4">
+                    <i class="fas fa-walking fa-2x text-primary mb-2"></i>
+                    <div class="fs-3 fw-bold text-primary">@Model.TotalPatrols</div>
+                    <div class="small text-muted">Total Patrols</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-4">
+                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                    <div class="fs-3 fw-bold text-success">@Model.CompletedPatrols</div>
+                    <div class="small text-muted">Completed Patrols</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-4">
+                    <i class="fas fa-users fa-2x text-info mb-2"></i>
+                    <div class="fs-3 fw-bold text-info">@Model.ActiveOfficers</div>
+                    <div class="small text-muted">Active Officers</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-4">
+                    <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                    <div class="fs-3 fw-bold text-danger">@Model.MissedLocationsTotal</div>
+                    <div class="small text-muted">Missed (30 days)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <a href="/Report/History" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm" style="transition: transform 0.15s;">
+                    <div class="card-body p-4 d-flex align-items-center">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center me-4"
+                             style="width:64px; height:64px; background:#003087;">
+                            <i class="fas fa-history text-white fa-2x"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-1">Walk History Report</h5>
+                            <p class="text-muted mb-0 small">Detailed walk history with statistics, filtering by officer, date, and status. Export to CSV.</p>
+                        </div>
+                        <i class="fas fa-chevron-right ms-auto text-muted"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="/Report/RoleReport" class="text-decoration-none">
+                <div class="card h-100 border-0 shadow-sm" style="transition: transform 0.15s;">
+                    <div class="card-body p-4 d-flex align-items-center">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center me-4"
+                             style="width:64px; height:64px; background:#198754;">
+                            <i class="fas fa-users text-white fa-2x"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-1">Role Report</h5>
+                            <p class="text-muted mb-0 small">Users grouped by role showing walk counts, completion rates, and last activity.</p>
+                        </div>
+                        <i class="fas fa-chevron-right ms-auto text-muted"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>

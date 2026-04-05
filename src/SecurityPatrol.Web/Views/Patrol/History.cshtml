@@ -1,0 +1,151 @@
+@model SecurityPatrol.Web.ViewModels.PatrolHistoryViewModel
+@using SecurityPatrol.Web.Models
+@{
+    ViewData["Title"] = "Patrol History";
+}
+
+<div class="page-header">
+    <div class="container">
+        <h2 class="mb-0"><i class="fas fa-history me-2"></i>Patrol History</h2>
+        <small class="opacity-75">@Model.TotalCount total patrols found</small>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">From Date</label>
+                    <input type="date" name="fromDate" class="form-control form-control-sm"
+                           value="@Model.FromDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">To Date</label>
+                    <input type="date" name="toDate" class="form-control form-control-sm"
+                           value="@Model.ToDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        @foreach (var s in Enum.GetValues<PatrolStatus>())
+                        {
+                            <option value="@s" selected="@(Model.StatusFilter == s)">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-search me-1"></i>Filter
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/Patrol/History" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Patrols.Any())
+    {
+        <div class="accordion" id="patrolsAccordion">
+            @for (int i = 0; i < Model.Patrols.Count; i++)
+            {
+                var patrol = Model.Patrols[i];
+                var collapseId = $"patrol-{patrol.PatrolId}";
+                var headerId = $"header-{patrol.PatrolId}";
+                var duration = patrol.Duration;
+                <div class="accordion-item mb-2 border rounded shadow-sm">
+                    <h2 class="accordion-header" id="@headerId">
+                        <button class="accordion-button collapsed" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#@collapseId">
+                            <div class="d-flex w-100 align-items-center gap-3 flex-wrap">
+                                <span class="fw-semibold">@patrol.StartTime.ToTzString(patrol.TimeZoneId, "MM/dd/yyyy HH:mm")</span>
+                                <span class="text-muted small">@(patrol.RouteName ?? "Ad-hoc")</span>
+                                <span class="text-muted small ms-auto">@patrol.OfficerName</span>
+                                <span class="badge @(patrol.Status == PatrolStatus.Completed ? "bg-success" : patrol.Status == PatrolStatus.InProgress ? "badge-status-inprogress" : "bg-danger")">
+                                    @patrol.Status
+                                </span>
+                                <span class="small text-muted">
+                                    @patrol.ScannedCount / @patrol.TotalLocations locations
+                                    @if (duration.HasValue)
+                                    {
+                                        <span> &mdash; @((int)duration.Value.TotalMinutes)m</span>
+                                    }
+                                </span>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#patrolsAccordion">
+                        <div class="accordion-body p-0">
+                            @if (patrol.Scans.Any())
+                            {
+                                <table class="table table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Location</th>
+                                            <th>Floor / Building</th>
+                                            <th>Notes</th>
+                                            <th>Photo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var scan in patrol.Scans)
+                                        {
+                                            <tr>
+                                                <td class="small">@scan.ScannedAt.ToTzString(scan.TimeZoneId, "HH:mm:ss")</td>
+                                                <td class="fw-semibold small">@scan.LocationName</td>
+                                                <td class="small text-muted">@scan.BuildingName @(scan.FloorName != null ? $"/ {scan.FloorName}" : "")</td>
+                                                <td class="small">@(scan.Notes ?? "-")</td>
+                                                <td>
+                                                    @if (!string.IsNullOrEmpty(scan.PhotoPath))
+                                                    {
+                                                        <a href="@scan.PhotoPath" target="_blank">
+                                                            <img src="@scan.PhotoPath" class="rounded" style="height:40px;" />
+                                                        </a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted small">-</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            else
+                            {
+                                <div class="p-3 text-muted small text-center">No locations scanned.</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    @for (int p = 1; p <= Model.TotalPages; p++)
+                    {
+                        <li class="page-item @(p == Model.CurrentPage ? "active" : "")">
+                            <a class="page-link" href="?page=@p&fromDate=@Model.FromDate?.ToString("yyyy-MM-dd")&toDate=@Model.ToDate?.ToString("yyyy-MM-dd")&status=@Model.StatusFilter">@p</a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        }
+    }
+    else
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-clipboard-list fa-3x mb-3 opacity-25"></i>
+            <p>No patrols found matching your filters.</p>
+            <a asp-action="Start" class="btn btn-primary">Start a Patrol</a>
+        </div>
+    }
+</div>

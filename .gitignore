@@ -1,0 +1,38 @@
+# SSL certificates (generated locally — never commit private keys)
+certs/
+*.pem
+*.key
+*.crt
+caddy-root.crt
+
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Published output
+/app/publish/
+
+# EF Core migrations designer files are tracked; exclude nothing extra from Migrations
+
+# ASP.NET Core data protection keys (runtime-generated)
+src/SecurityPatrol.Web/dataprotection-keys/
+
+# Uploaded files (runtime data)
+src/SecurityPatrol.Web/wwwroot/uploads/*
+!src/SecurityPatrol.Web/wwwroot/uploads/.gitkeep
+
+# Environment / secrets
+.env
+*.env
+appsettings.Development.json
+secrets.json
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Docker volumes (not files, but just in case)
+sqlserver_data/

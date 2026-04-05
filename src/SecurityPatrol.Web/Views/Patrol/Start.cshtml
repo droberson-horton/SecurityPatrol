@@ -1,0 +1,148 @@
+@model SecurityPatrol.Web.ViewModels.PatrolStartViewModel
+@{
+    ViewData["Title"] = "Start Patrol";
+}
+
+<div class="page-header">
+    <div class="container">
+        <h2 class="mb-0"><i class="fas fa-play-circle me-2"></i>Start Security Patrol</h2>
+        <small class="opacity-75">Select a route and begin your patrol</small>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row g-4">
+        @if (Model.TodaysSchedules.Any())
+        {
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-calendar-check me-2"></i>Today's Scheduled Patrols</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            @foreach (var sched in Model.TodaysSchedules)
+                            {
+                                <div class="col-md-4">
+                                    <div class="card border h-100">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold">@sched.PatrolRoute.Name</h6>
+                                            <p class="text-muted small mb-2">
+                                                <i class="fas fa-clock me-1"></i>
+                                                @sched.StartTime.ToString(@"hh\:mm") - @sched.EndTime.ToString(@"hh\:mm")
+                                            </p>
+                                            @if (!string.IsNullOrEmpty(sched.Notes))
+                                            {
+                                                <p class="small mb-2">@sched.Notes</p>
+                                            }
+                                            <form method="post" asp-action="Start">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="patrolRouteId" value="@sched.PatrolRouteId" />
+                                                <input type="hidden" name="scheduledPatrolId" value="@sched.Id" />
+                                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                                    <i class="fas fa-walking me-1"></i>Start This Patrol
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header" style="background:#003087; color:white;">
+                    <h6 class="mb-0"><i class="fas fa-route me-2"></i>Start Ad-Hoc Patrol</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post" asp-action="Start" id="startPatrolForm">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Select Patrol Route <span class="text-danger">*</span></label>
+                            <select name="patrolRouteId" class="form-select" required id="routeSelect">
+                                <option value="">-- Select a route --</option>
+                                @foreach (var route in Model.AvailableRoutes)
+                                {
+                                    <option value="@route.Id">@route.Name (@route.PatrolRouteLocations.Count locations)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div id="routePreview" class="mb-4 d-none">
+                            <label class="form-label fw-semibold text-muted small">Route Locations Preview</label>
+                            @foreach (var route in Model.AvailableRoutes)
+                            {
+                                <div class="route-locations d-none" id="route-@route.Id">
+                                    <ol class="list-group list-group-numbered list-group-flush">
+                                        @foreach (var wrl in route.PatrolRouteLocations.OrderBy(x => x.OrderIndex))
+                                        {
+                                            <li class="list-group-item py-2 d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <span class="fw-semibold">@wrl.Location.Name</span>
+                                                    <small class="text-muted ms-2">@wrl.Location.Building?.Name @(wrl.Location.Floor != null ? $"/ {wrl.Location.Floor.Name}" : "")</small>
+                                                </div>
+                                                <i class="fas fa-map-marker-alt text-muted"></i>
+                                            </li>
+                                        }
+                                    </ol>
+                                </div>
+                            }
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="startBtn" disabled>
+                            <i class="fas fa-play me-2"></i>Begin Patrol
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card bg-light border-0">
+                <div class="card-body">
+                    <h6 class="fw-bold"><i class="fas fa-info-circle me-2 text-primary"></i>Patrol Instructions</h6>
+                    <ul class="list-unstyled small text-muted">
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Select your assigned route or choose from scheduled patrols</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Visit each location in the route order</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Scan the QR code at each location</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Add notes or photos if needed</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>End the patrol when all locations are checked</li>
+                    </ul>
+                    <hr />
+                    <p class="small text-muted mb-0">
+                        <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                        Missed locations will be flagged for review by your supervisor.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        var routeSelect = document.getElementById('routeSelect');
+        var startBtn = document.getElementById('startBtn');
+        // startPatrolForm used above
+        var routePreview = document.getElementById('routePreview');
+
+        routeSelect.addEventListener('change', function () {
+            var val = this.value;
+            startBtn.disabled = !val;
+            document.querySelectorAll('.route-locations').forEach(function (el) {
+                el.classList.add('d-none');
+            });
+            if (val) {
+                routePreview.classList.remove('d-none');
+                var preview = document.getElementById('route-' + val);
+                if (preview) preview.classList.remove('d-none');
+            } else {
+                routePreview.classList.add('d-none');
+            }
+        });
+    </script>
+}

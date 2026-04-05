@@ -1,0 +1,496 @@
+@model SecurityPatrol.Web.ViewModels.SiteAdminViewModel
+@using SecurityPatrol.Web.Models
+@using System.Collections.ObjectModel
+@{
+    var timeZones = ViewBag.TimeZones as ReadOnlyCollection<TimeZoneInfo> ?? new ReadOnlyCollection<TimeZoneInfo>(new List<TimeZoneInfo>());
+    ViewData["Title"] = "Site Administration";
+    var openId = Context.Request.Query["open"].ToString();
+}
+
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-building me-2"></i>Site Administration</h2>
+            <small class="opacity-75">Manage buildings, floors, and locations</small>
+        </div>
+        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addBuildingModal">
+            <i class="fas fa-plus me-1"></i>Add Building
+        </button>
+    </div>
+</div>
+
+<div class="container">
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!Model.BuildingTree.Any())
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-building fa-3x mb-3 opacity-25"></i>
+            <p>No active buildings found. Add a building to get started.</p>
+        </div>
+    }
+    else
+    {
+        <div class="accordion" id="buildingAccordion">
+            @foreach (var building in Model.BuildingTree)
+            {
+                var bId = $"building-{building.Id}";
+                var isOpen = openId == building.Id.ToString();
+                <div class="accordion-item mb-3 border rounded shadow-sm">
+                    <h2 class="accordion-header" id="heading-@building.Id">
+                        <button class="accordion-button @(isOpen ? "" : "collapsed") fw-semibold" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#@bId"
+                                aria-expanded="@(isOpen ? "true" : "false")" aria-controls="@bId">
+                            <i class="fas fa-building me-2 text-primary"></i>
+                            @building.Name
+                            @if (!string.IsNullOrEmpty(building.Address))
+                            {
+                                <small class="text-muted ms-2 fw-normal">— @building.Address</small>
+                            }
+                            <span class="badge bg-success ms-3 fw-normal small">Active</span>
+                            <span class="badge bg-secondary ms-2 fw-normal small">@building.Floors.Count floor(s)</span>
+                        </button>
+                    </h2>
+                    <div id="@bId" class="accordion-collapse collapse @(isOpen ? "show" : "")" aria-labelledby="heading-@building.Id"
+                         data-bs-parent="#buildingAccordion">
+                        <div class="accordion-body">
+                            <div class="d-flex gap-2 mb-3">
+                                <button class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="modal" data-bs-target="#editBuildingModal"
+                                        data-id="@building.Id"
+                                        data-name="@building.Name"
+                                        data-address="@building.Address"
+                                        data-timezone="@(building.TimeZoneId ?? "")"
+                                        data-isactive="@building.IsActive.ToString().ToLower()">
+                                    <i class="fas fa-edit me-1"></i>Edit Building
+                                </button>
+                                <form method="post" asp-action="DeleteBuilding" class="d-inline"
+                                      onsubmit="return confirm('Deactivate this building?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@building.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-trash me-1"></i>Deactivate
+                                    </button>
+                                </form>
+                                <button class="btn btn-sm btn-outline-success ms-auto"
+                                        data-bs-toggle="modal" data-bs-target="#addFloorModal"
+                                        data-buildingid="@building.Id"
+                                        data-buildingname="@building.Name">
+                                    <i class="fas fa-plus me-1"></i>Add Floor
+                                </button>
+                            </div>
+
+                            @if (!building.Floors.Any())
+                            {
+                                <div class="text-muted small fst-italic ps-2">No floors. Add a floor to this building.</div>
+                            }
+                            else
+                            {
+                                @foreach (var floor in building.Floors)
+                                {
+                                    <div class="card mb-3">
+                                        <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#f0f4ff;">
+                                            <div>
+                                                <i class="fas fa-layer-group me-2 text-info"></i>
+                                                <span class="fw-semibold">@floor.Name</span>
+                                                <small class="text-muted ms-2">(Floor @floor.FloorNumber)</small>
+                                                <span class="badge bg-success ms-2 small">Active</span>
+                                            </div>
+                                            <div class="d-flex gap-2 align-items-center">
+                                                <button class="btn btn-sm btn-outline-success"
+                                                        data-bs-toggle="modal" data-bs-target="#addLocationModal"
+                                                        data-buildingid="@building.Id"
+                                                        data-floorid="@floor.Id"
+                                                        data-floorname="@floor.Name">
+                                                    <i class="fas fa-plus me-1"></i>Add Location
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        data-bs-toggle="modal" data-bs-target="#editFloorModal"
+                                                        data-id="@floor.Id"
+                                                        data-buildingid="@floor.BuildingId"
+                                                        data-name="@floor.Name"
+                                                        data-floornumber="@floor.FloorNumber"
+                                                        data-isactive="@floor.IsActive.ToString().ToLower()">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <form method="post" asp-action="DeleteFloor" class="d-inline"
+                                                      onsubmit="return confirm('Deactivate this floor?')">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@floor.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            @if (!floor.Locations.Any())
+                                            {
+                                                <div class="text-muted small fst-italic p-3">No locations on this floor.</div>
+                                            }
+                                            else
+                                            {
+                                                <table class="table table-sm table-hover mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th class="ps-4">Name</th>
+                                                            <th>Description</th>
+                                                            <th>QR Code</th>
+                                                            <th>Active</th>
+                                                            <th>Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var loc in floor.Locations)
+                                                        {
+                                                            <tr>
+                                                                <td class="ps-4 fw-semibold small">@loc.Name</td>
+                                                                <td class="small text-muted">@(loc.Description ?? "-")</td>
+                                                                <td class="small font-monospace text-muted">
+                                                                    @(loc.QrCode.Length > 20 ? loc.QrCode.Substring(0, 20) + "…" : loc.QrCode)
+                                                                </td>
+                                                                <td>
+                                                                    @if (loc.IsActive)
+                                                                    {
+                                                                        <span class="badge bg-success">Active</span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span class="badge bg-secondary">Inactive</span>
+                                                                    }
+                                                                </td>
+                                                                <td>
+                                                                    <button class="btn btn-sm btn-outline-primary me-1"
+                                                                            data-bs-toggle="modal" data-bs-target="#editLocationModal"
+                                                                            data-id="@loc.Id"
+                                                                            data-buildingid="@loc.BuildingId"
+                                                                            data-floorid="@loc.FloorId"
+                                                                            data-name="@loc.Name"
+                                                                            data-description="@loc.Description"
+                                                                            data-isactive="@loc.IsActive.ToString().ToLower()">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </button>
+                                                                    <form method="post" asp-action="DeleteLocation" class="d-inline"
+                                                                          onsubmit="return confirm('Deactivate this location?')">
+                                                                        @Html.AntiForgeryToken()
+                                                                        <input type="hidden" name="id" value="@loc.Id" />
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                                            <i class="fas fa-trash"></i>
+                                                                        </button>
+                                                                    </form>
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Add Building Modal -->
+<div class="modal fade" id="addBuildingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-building me-2"></i>Add Building</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="CreateBuilding">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" required maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Address</label>
+                        <input type="text" name="Address" class="form-control" maxlength="500" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Timezone</label>
+                        <select name="TimeZoneId" class="form-select">
+                            <option value="">-- Select Timezone --</option>
+                            @foreach (var tz in timeZones)
+                            {
+                                <option value="@tz.Id">@tz.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="addBldgActive" checked />
+                        <label class="form-check-label" for="addBldgActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Building Modal -->
+<div class="modal fade" id="editBuildingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Building</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="EditBuilding">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editBldgId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" id="editBldgName" class="form-control" required maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Address</label>
+                        <input type="text" name="Address" id="editBldgAddress" class="form-control" maxlength="500" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Timezone</label>
+                        <select name="TimeZoneId" id="editBldgTimezone" class="form-select">
+                            <option value="">-- Select Timezone --</option>
+                            @foreach (var tz in timeZones)
+                            {
+                                <option value="@tz.Id">@tz.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="editBldgActive" />
+                        <label class="form-check-label" for="editBldgActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Floor Modal -->
+<div class="modal fade" id="addFloorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Add Floor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="CreateFloor">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="BuildingId" id="addFloorBuildingId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Building</label>
+                        <input type="text" id="addFloorBuildingName" class="form-control" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" required maxlength="100" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Number <span class="text-danger">*</span></label>
+                        <input type="number" name="FloorNumber" class="form-control" required value="1" />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="addFloorActive" checked />
+                        <label class="form-check-label" for="addFloorActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Floor Modal -->
+<div class="modal fade" id="editFloorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Floor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="EditFloor">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editFloorId" />
+                <input type="hidden" name="BuildingId" id="editFloorBuildingId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" id="editFloorName" class="form-control" required maxlength="100" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Number <span class="text-danger">*</span></label>
+                        <input type="number" name="FloorNumber" id="editFloorNumber" class="form-control" required />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="editFloorActive" />
+                        <label class="form-check-label" for="editFloorActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Location Modal -->
+<div class="modal fade" id="addLocationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-map-marker-alt me-2"></i>Add Location</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="CreateLocation">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="BuildingId" id="addLocBuildingId" />
+                <input type="hidden" name="FloorId" id="addLocFloorId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor</label>
+                        <input type="text" id="addLocFloorName" class="form-control" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Location Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" required maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        <input type="text" name="Description" class="form-control" maxlength="500" />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="addLocActive" checked />
+                        <label class="form-check-label" for="addLocActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Location Modal -->
+<div class="modal fade" id="editLocationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Location</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="EditLocation">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editLocId" />
+                <input type="hidden" name="BuildingId" id="editLocBuildingId" />
+                <input type="hidden" name="FloorId" id="editLocFloorId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Location Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" id="editLocName" class="form-control" required maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        <input type="text" name="Description" id="editLocDescription" class="form-control" maxlength="500" />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="editLocActive" />
+                        <label class="form-check-label" for="editLocActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Edit Building Modal
+        document.getElementById('editBuildingModal').addEventListener('show.bs.modal', function (e) {
+            var btn = e.relatedTarget;
+            document.getElementById('editBldgId').value = btn.dataset.id;
+            document.getElementById('editBldgName').value = btn.dataset.name;
+            document.getElementById('editBldgAddress').value = btn.dataset.address || '';
+            document.getElementById('editBldgTimezone').value = btn.dataset.timezone || '';
+            document.getElementById('editBldgActive').checked = btn.dataset.isactive === 'true';
+        });
+
+        // Add Floor Modal
+        document.getElementById('addFloorModal').addEventListener('show.bs.modal', function (e) {
+            var btn = e.relatedTarget;
+            document.getElementById('addFloorBuildingId').value = btn.dataset.buildingid;
+            document.getElementById('addFloorBuildingName').value = btn.dataset.buildingname;
+        });
+
+        // Edit Floor Modal
+        document.getElementById('editFloorModal').addEventListener('show.bs.modal', function (e) {
+            var btn = e.relatedTarget;
+            document.getElementById('editFloorId').value = btn.dataset.id;
+            document.getElementById('editFloorBuildingId').value = btn.dataset.buildingid;
+            document.getElementById('editFloorName').value = btn.dataset.name;
+            document.getElementById('editFloorNumber').value = btn.dataset.floornumber;
+            document.getElementById('editFloorActive').checked = btn.dataset.isactive === 'true';
+        });
+
+        // Add Location Modal
+        document.getElementById('addLocationModal').addEventListener('show.bs.modal', function (e) {
+            var btn = e.relatedTarget;
+            document.getElementById('addLocBuildingId').value = btn.dataset.buildingid;
+            document.getElementById('addLocFloorId').value = btn.dataset.floorid;
+            document.getElementById('addLocFloorName').value = btn.dataset.floorname;
+        });
+
+        // Edit Location Modal
+        document.getElementById('editLocationModal').addEventListener('show.bs.modal', function (e) {
+            var btn = e.relatedTarget;
+            document.getElementById('editLocId').value = btn.dataset.id;
+            document.getElementById('editLocBuildingId').value = btn.dataset.buildingid;
+            document.getElementById('editLocFloorId').value = btn.dataset.floorid || '';
+            document.getElementById('editLocName').value = btn.dataset.name;
+            document.getElementById('editLocDescription').value = btn.dataset.description || '';
+            document.getElementById('editLocActive').checked = btn.dataset.isactive === 'true';
+        });
+    </script>
+}

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: securitypatrol-sqlserver
+    user: root
+    environment:
+      MSSQL_SA_PASSWORD: "SecPatrol@Sql2024!"
+      ACCEPT_EULA: "1"
+      MSSQL_PID: "Developer"
+      MSSQL_MEMORY_LIMIT_MB: "1024"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    restart: unless-stopped
+    networks:
+      - securitypatrol_net
+
+  app:
+    build:
+      context: .
+      dockerfile: src/SecurityPatrol.Web/Dockerfile
+    container_name: securitypatrol-app
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=SecurityPatrol;User Id=sa;Password=SecPatrol@Sql2024!;TrustServerCertificate=True;Encrypt=False;ConnectRetryCount=10;ConnectRetryInterval=10;"
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_uploads:/app/wwwroot/uploads
+      - app_dataprotection:/app/dataprotection-keys
+    depends_on:
+      - sqlserver
+    networks:
+      - securitypatrol_net
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: securitypatrol-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - securitypatrol_net
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_dataprotection:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+
+networks:
+  securitypatrol_net:
+    driver: bridge

@@ -1,0 +1,53 @@
+@using SecurityPatrol.Web.Models
+@{
+    ViewData["Title"] = "Print QR Codes";
+    Layout = null;
+    var qrItems = ViewBag.QrItems as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>DRH Security - QR Codes</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; border-bottom: 2px solid #003087; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h1 { color: #003087; margin: 0; }
+        .qr-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+        .qr-item { border: 1px solid #ccc; border-radius: 8px; padding: 15px; text-align: center; width: 200px; break-inside: avoid; }
+        .qr-item img { width: 160px; height: 160px; }
+        .location-name { font-weight: bold; font-size: 14px; margin-top: 8px; }
+        .location-detail { color: #666; font-size: 11px; margin: 4px 0; }
+        .qr-code { font-size: 9px; color: #999; word-break: break-all; margin-top: 4px; }
+        .print-btn { position: fixed; top: 10px; right: 10px; background: #003087; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        @@media print {
+            .print-btn { display: none; }
+            .header { border-color: #000; }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn" onclick="window.print()">Print</button>
+    <div class="header">
+        <h1>DRH Security &mdash; Location QR Codes</h1>
+        <p>Generated on @DateTime.Now.ToString("MMMM dd, yyyy HH:mm")</p>
+    </div>
+    <div class="qr-grid">
+        @foreach (var item in qrItems)
+        {
+            Location loc = item.Location;
+            string qrBase64 = item.QrBase64;
+            <div class="qr-item">
+                <img src="data:image/png;base64,@qrBase64" alt="QR Code for @loc.Name" />
+                <div class="location-name">@loc.Name</div>
+                <div class="location-detail">@loc.Building.Name</div>
+                @if (loc.Floor != null)
+                {
+                    <div class="location-detail">@loc.Floor.Name</div>
+                }
+                <div class="qr-code">@loc.QrCode</div>
+            </div>
+        }
+    </div>
+</body>
+</html>

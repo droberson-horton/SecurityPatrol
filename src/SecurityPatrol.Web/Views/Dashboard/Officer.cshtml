@@ -1,0 +1,207 @@
+@model SecurityPatrol.Web.ViewModels.OfficerDashboardViewModel
+@{
+    ViewData["Title"] = "Officer Dashboard";
+}
+
+<div class="page-header no-print">
+    <div class="container">
+        <h2 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>Officer Dashboard</h2>
+        <small class="opacity-75">Welcome back, @User.Identity?.Name &mdash; @DateTime.Now.ToString("dddd, MMMM dd yyyy")</small>
+    </div>
+</div>
+
+<div class="container">
+
+    @if (Model.ActiveMessages.Any())
+    {
+        <div class="alert alert-info border-0 shadow-sm mb-4" role="alert">
+            <h6 class="alert-heading"><i class="fas fa-bell me-2"></i>Admin Messages</h6>
+            @foreach (var msg in Model.ActiveMessages)
+            {
+                <div class="mb-2">
+                    <strong>@msg.Title</strong>
+                    <p class="mb-0 small">@msg.Body</p>
+                </div>
+                if (msg != Model.ActiveMessages.Last()) { <hr class="my-2" /> }
+            }
+        </div>
+    }
+
+    @if (Model.ActiveWalk != null)
+    {
+        <div class="alert alert-warning d-flex align-items-center mb-4 shadow-sm" role="alert">
+            <i class="fas fa-walking fa-2x me-3"></i>
+            <div class="flex-grow-1">
+                <strong>Patrol In Progress!</strong>
+                <p class="mb-0 small">Started at @Model.ActiveWalk.StartTime.ToLocalTime().ToString("HH:mm")</p>
+            </div>
+            <a asp-controller="Patrol" asp-action="Active" asp-route-patrolId="@Model.ActiveWalk.Id"
+               class="btn btn-warning fw-semibold ms-2">
+                <i class="fas fa-arrow-right me-1"></i>Resume Patrol
+            </a>
+        </div>
+    }
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100 text-center">
+                <div class="card-body py-4">
+                    <i class="fas fa-route fa-3x text-primary mb-3"></i>
+                    <h5>Start a Patrol</h5>
+                    <p class="text-muted small">Begin a new security patrol</p>
+                    <a asp-controller="Patrol" asp-action="Start" class="btn btn-primary fw-semibold">
+                        <i class="fas fa-play me-1"></i>Start Patrol
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 text-center @(Model.TodaysScheduledWalks.Any() ? "border-primary" : "")">
+                <div class="card-body py-4">
+                    <i class="fas fa-calendar-check fa-3x text-success mb-3"></i>
+                    <h5>Today's Schedules</h5>
+                    <p class="text-muted small">@Model.TodaysScheduledWalks.Count scheduled patrol(s) today</p>
+                    @if (Model.TodaysScheduledWalks.Any())
+                    {
+                        <ul class="list-group list-group-flush text-start">
+                            @foreach (var s in Model.TodaysScheduledWalks)
+                            {
+                                <li class="list-group-item py-1 small d-flex justify-content-between">
+                                    <span><i class="fas fa-clock me-1 text-muted"></i>@s.StartTime.ToString(@"hh\:mm") - @(s.PatrolRoute?.Name ?? "Unassigned")</span>
+                                    @if (s.IsCompleted)
+                                    {
+                                        <span class="badge bg-success">Done</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <span class="text-muted small">No schedules for today</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 text-center @(Model.MissedLocationCount > 0 ? "border-danger" : "border-success")">
+                <div class="card-body py-4">
+                    <i class="fas fa-exclamation-triangle fa-3x @(Model.MissedLocationCount > 0 ? "text-danger" : "text-success") mb-3"></i>
+                    <h5>Missed Locations</h5>
+                    <p class="text-muted small">Last 7 days</p>
+                    @if (Model.MissedLocationCount > 0)
+                    {
+                        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#missedModal">
+                            <span class="badge bg-white text-danger me-1">@Model.MissedLocationCount</span>
+                            View Missed
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success fs-6 px-3 py-2">All Clear!</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center" style="background:#003087; color:white;">
+            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Recent Patrol History</h6>
+            <a asp-controller="Patrol" asp-action="History" class="btn btn-sm btn-outline-light">View All</a>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.RecentWalks.Any())
+            {
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Route</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var walk in Model.RecentWalks)
+                        {
+                            var duration = walk.EndTime.HasValue ? walk.EndTime.Value - walk.StartTime : (TimeSpan?)null;
+                            <tr>
+                                <td>@walk.StartTime.ToLocalTime().ToString("MM/dd/yyyy HH:mm")</td>
+                                <td>@(walk.ScheduledPatrol?.PatrolRoute?.Name ?? "Ad-hoc")</td>
+                                <td>
+                                    @if (duration.HasValue)
+                                    {
+                                        @($"{(int)duration.Value.TotalMinutes}m")
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge badge-status-@walk.Status.ToString().ToLower()">
+                                        @walk.Status
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-clipboard-list fa-3x mb-3 opacity-25"></i>
+                    <p>No patrol history yet. Start your first patrol!</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (Model.MissedLocationCount > 0)
+{
+    <div class="modal fade" id="missedModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Missed Locations (Last 7 Days)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Route</th>
+                                <th>Location</th>
+                                <th>Building/Floor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.MissedLocations)
+                            {
+                                <tr>
+                                    <td>@item.ScheduledDate.ToString("MM/dd/yyyy")</td>
+                                    <td>@item.RouteName</td>
+                                    <td>@item.LocationName</td>
+                                    <td>@item.BuildingName / @item.FloorName</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

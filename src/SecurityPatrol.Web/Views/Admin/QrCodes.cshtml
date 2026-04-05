@@ -1,0 +1,141 @@
+@using SecurityPatrol.Web.Models
+@{
+    ViewData["Title"] = "QR Codes";
+    var buildings = ViewBag.Buildings as List<Building> ?? new List<Building>();
+    var floors = ViewBag.Floors as List<Floor> ?? new List<Floor>();
+    var locations = ViewBag.Locations as List<Location> ?? new List<Location>();
+    int? selectedBuildingId = ViewBag.SelectedBuildingId;
+    int? selectedFloorId = ViewBag.SelectedFloorId;
+    int? selectedLocationId = ViewBag.SelectedLocationId;
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code Generator</h2>
+            <small class="opacity-75">Generate and print QR codes for scan locations</small>
+        </div>
+        @if (locations.Any())
+        {
+            <a asp-action="PrintQrCodes"
+               asp-route-buildingId="@selectedBuildingId"
+               asp-route-floorId="@selectedFloorId"
+               asp-route-locationId="@selectedLocationId"
+               target="_blank"
+               class="btn btn-light">
+                <i class="fas fa-print me-1"></i>Print QR Codes
+            </a>
+        }
+    </div>
+</div>
+
+<div class="container">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header" style="background:#003087; color:white;">
+                    <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Select Scope</h6>
+                </div>
+                <div class="card-body">
+                    <form method="get" id="filterForm">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Building</label>
+                            <select name="buildingId" class="form-select" id="buildingSelect">
+                                <option value="">All Buildings</option>
+                                @foreach (var b in buildings)
+                                {
+                                    <option value="@b.Id" selected="@(selectedBuildingId == b.Id)">@b.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3" id="floorGroup" style="@(selectedBuildingId == null ? "display:none" : "")">
+                            <label class="form-label fw-semibold">Floor (optional)</label>
+                            <select name="floorId" class="form-select" id="floorSelect">
+                                <option value="">All Floors</option>
+                                @foreach (var f in floors)
+                                {
+                                    <option value="@f.Id" selected="@(selectedFloorId == f.Id)">@f.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3" id="locationGroup" style="@(selectedBuildingId == null ? "display:none" : "")">
+                            <label class="form-label fw-semibold">Specific Location (optional)</label>
+                            <select name="locationId" class="form-select">
+                                <option value="">All Locations</option>
+                                @foreach (var l in locations)
+                                {
+                                    <option value="@l.Id" selected="@(selectedLocationId == l.Id)">@l.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-sync me-1"></i>Generate Preview
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            @if (locations.Any())
+            {
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center" style="background:#003087; color:white;">
+                        <span><i class="fas fa-eye me-2"></i>Preview (@locations.Count location(s))</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            @foreach (var loc in locations)
+                            {
+                                <div class="col-sm-6 col-lg-4">
+                                    <div class="card border text-center p-3">
+                                        <div class="fw-bold small mb-1">@loc.Name</div>
+                                        <div class="text-muted small mb-2">@loc.Building.Name @(loc.Floor != null ? $"/ {loc.Floor.Name}" : "")</div>
+                                        <div class="bg-light rounded p-2 mb-2">
+                                            <i class="fas fa-qrcode fa-3x text-muted"></i>
+                                        </div>
+                                        <code class="small text-muted" style="word-break:break-all;">@loc.QrCode</code>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (selectedBuildingId != null)
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-search fa-3x mb-3 opacity-25"></i>
+                    <p>No locations found for the selected filters.</p>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-qrcode fa-4x mb-3 opacity-25"></i>
+                    <p>Select a building to preview QR codes.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('buildingSelect').addEventListener('change', function () {
+            var val = this.value;
+            document.getElementById('floorGroup').style.display = val ? '' : 'none';
+            document.getElementById('locationGroup').style.display = val ? '' : 'none';
+            if (val) {
+                $.get('/SiteAdmin/GetFloorsByBuilding', { buildingId: val }, function (floors) {
+                    var select = document.getElementById('floorSelect');
+                    select.innerHTML = '<option value="">All Floors</option>';
+                    floors.forEach(function (f) {
+                        select.innerHTML += '<option value="' + f.id + '">' + f.name + '</option>';
+                    });
+                });
+            }
+            document.getElementById('filterForm').submit();
+        });
+    </script>
+}

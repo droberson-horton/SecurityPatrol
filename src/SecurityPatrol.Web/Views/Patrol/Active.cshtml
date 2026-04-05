@@ -1,0 +1,389 @@
+@model SecurityPatrol.Web.ViewModels.PatrolActiveViewModel
+@{
+    ViewData["Title"] = "Active Patrol";
+    var progressPct = (int)Model.ProgressPercent;
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-walking me-2"></i>Patrol In Progress</h2>
+            <small class="opacity-75">
+                Started: @Model.Patrol.StartTime.ToTzString(Model.TimeZoneId, "HH:mm") &mdash;
+                Route: @(Model.Patrol.ScheduledPatrol?.PatrolRoute?.Name ?? "Ad-hoc Patrol")
+            </small>
+        </div>
+        <div class="text-end">
+            <div class="fs-4 fw-bold">@Model.ScannedCount / @Model.TotalCount</div>
+            <small class="opacity-75">Locations Scanned</small>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row g-4">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold small">Progress</span>
+                        <span class="small text-muted">@progressPct%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" role="progressbar"
+                             style="width: @progressPct%"
+                             aria-valuenow="@progressPct" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="fw-bold mb-3"><i class="fas fa-qrcode me-2 text-primary"></i>Scan QR Code</h6>
+                    <p class="text-muted small">Point your camera at a location QR code.</p>
+
+                    <button class="btn btn-primary btn-lg w-100 mb-2" id="openCameraBtn">
+                        <i class="fas fa-camera me-2"></i>Scan QR Code
+                    </button>
+
+                    <!-- Live camera view (getUserMedia — localhost / HTTPS only) -->
+                    <div id="cameraSection" class="d-none mb-2">
+                        <div style="position:relative;">
+                            <video id="qr-video" playsinline muted
+                                   style="width:100%; border-radius:4px; border:1px solid #dee2e6; display:block;"></video>
+                        </div>
+                        <canvas id="qr-canvas" style="display:none;"></canvas>
+                        <button type="button" class="btn btn-secondary btn-sm w-100 mt-2" id="stopCameraBtn">
+                            <i class="fas fa-stop me-1"></i>Stop Camera
+                        </button>
+                    </div>
+
+                    <!-- Native camera capture (HTTP over IP — Android, etc.) -->
+                    <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" class="d-none" />
+
+                    <!-- Preview of captured image -->
+                    <img id="capturePreview" class="d-none img-fluid rounded border mb-1" style="max-height:180px;" alt="Captured image" />
+
+                    <div id="scanResult" class="d-none alert small mt-2"></div>
+
+                    <!-- Hidden form used by submitCode() -->
+                    <form method="post" asp-action="ScanManual" class="d-none" id="manualScanForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="patrolId" value="@Model.Patrol.Id" />
+                        <input type="hidden" name="qrCode" id="manualQrInput" />
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header" style="background:#003087; color:white;">
+                    <h6 class="mb-0"><i class="fas fa-list-check me-2"></i>Location Checklist</h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    @foreach (var loc in Model.LocationProgress)
+                    {
+                        <div class="list-group-item @(loc.IsScanned ? "location-card-scanned" : "location-card-pending")">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    @if (loc.IsScanned)
+                                    {
+                                        <i class="fas fa-check-circle fa-2x text-success"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="far fa-circle fa-2x text-muted"></i>
+                                    }
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">@loc.LocationName</div>
+                                    <small class="text-muted">@loc.BuildingName @(loc.FloorName != null ? $"/ {loc.FloorName}" : "")</small>
+                                </div>
+                                <div class="text-end">
+                                    @if (loc.IsScanned && loc.ScannedAt.HasValue)
+                                    {
+                                        <small class="text-success">@loc.ScannedAt.Value.ToTzString(loc.TimeZoneId, "HH:mm")</small>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Pending</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h6 class="fw-bold text-danger mb-3"><i class="fas fa-stop-circle me-2"></i>End Patrol</h6>
+                    <p class="text-muted small">
+                        @if (Model.ScannedCount < Model.TotalCount)
+                        {
+                            <span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>@(Model.TotalCount - Model.ScannedCount) location(s) not yet scanned.</span>
+                        }
+                        else
+                        {
+                            <span class="text-success"><i class="fas fa-check-circle me-1"></i>All locations scanned!</span>
+                        }
+                    </p>
+                    <button class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#endPatrolModal">
+                        <i class="fas fa-flag-checkered me-2"></i>End Patrol
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="endPatrolModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-flag-checkered me-2"></i>End Patrol</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                @if (Model.ScannedCount < Model.TotalCount)
+                {
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> You have @(Model.TotalCount - Model.ScannedCount) unscanned location(s). Ending now will mark this patrol as Incomplete.
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-success">
+                        All @Model.TotalCount locations have been scanned. This patrol will be marked as Completed.
+                    </div>
+                }
+                <p>Are you sure you want to end this patrol?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" asp-action="End">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="patrolId" value="@Model.Patrol.Id" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-flag-checkered me-1"></i>Confirm End Patrol
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- jsQR served locally — works without internet / CDN access -->
+    <script src="~/lib/jsqr/jsQR.min.js"></script>
+    <script>
+        // ── Decoder capability check ─────────────────────────────────────────
+        var hasBarcodeDetector = ('BarcodeDetector' in window);
+        var hasJsQr            = (typeof jsQR === 'function');
+
+        // ── State ────────────────────────────────────────────────────────────
+        var videoStream = null;
+        var scanAnimId  = null;
+        var isScanning  = false;
+
+        // ── UI helpers ───────────────────────────────────────────────────────
+        function showResult(msg, type) {
+            var el = document.getElementById('scanResult');
+            el.className = 'alert alert-' + type + ' small mt-2';
+            el.innerHTML = msg;
+            el.classList.remove('d-none');
+        }
+
+        function showFallback(msg) {
+            showResult(msg, 'warning');
+        }
+
+        // ── Camera control ───────────────────────────────────────────────────
+        function stopCamera() {
+            isScanning = false;
+            if (scanAnimId) { cancelAnimationFrame(scanAnimId); scanAnimId = null; }
+            if (videoStream) { videoStream.getTracks().forEach(function (t) { t.stop(); }); videoStream = null; }
+            var video = document.getElementById('qr-video');
+            video.srcObject = null;
+            document.getElementById('cameraSection').classList.add('d-none');
+            document.getElementById('openCameraBtn').classList.remove('d-none');
+        }
+
+        function submitCode(text) {
+            stopCamera();
+            document.getElementById('manualQrInput').value = text;
+            document.getElementById('manualScanForm').submit();
+        }
+
+        // ── jsQR helper: try decoding canvas at current size, then 3 rotations ──
+        // Android JPEG from native capture may have EXIF rotation; canvas may not
+        // auto-apply it, so we try all four orientations.
+        function jsQrAllRotations(ctx, w, h) {
+            // 0°
+            var id = ctx.getImageData(0, 0, w, h);
+            var r  = jsQR(id.data, id.width, id.height, { inversionAttempts: 'attemptBoth' });
+            if (r) return r.data;
+
+            // 90°, 180°, 270° — draw rotated into a temp canvas
+            var rotations = [90, 180, 270];
+            for (var i = 0; i < rotations.length; i++) {
+                var deg = rotations[i];
+                var swap = (deg === 90 || deg === 270);
+                var rw = swap ? h : w;
+                var rh = swap ? w : h;
+                var tmp = document.createElement('canvas');
+                tmp.width = rw; tmp.height = rh;
+                var tc = tmp.getContext('2d');
+                tc.translate(rw / 2, rh / 2);
+                tc.rotate(deg * Math.PI / 180);
+                tc.drawImage(ctx.canvas, -w / 2, -h / 2);
+                var rid = tc.getImageData(0, 0, rw, rh);
+                r = jsQR(rid.data, rid.width, rid.height, { inversionAttempts: 'attemptBoth' });
+                if (r) return r.data;
+            }
+            return null;
+        }
+
+        // ── Live camera scan loop ────────────────────────────────────────────
+        function scanFrame() {
+            if (!isScanning) return;
+
+            var video = document.getElementById('qr-video');
+            if (video.readyState < 2 || video.videoWidth === 0) {
+                scanAnimId = requestAnimationFrame(scanFrame);
+                return;
+            }
+
+            var canvas = document.getElementById('qr-canvas');
+            var w = video.videoWidth, h = video.videoHeight;
+            canvas.width = w; canvas.height = h;
+            var ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(video, 0, 0);
+
+            if (hasBarcodeDetector) {
+                var detector = new BarcodeDetector({ formats: ['qr_code'] });
+                detector.detect(canvas).then(function (codes) {
+                    if (!isScanning) return;
+                    if (codes.length > 0) { submitCode(codes[0].rawValue); return; }
+                    // BarcodeDetector found nothing — try jsQR on same frame
+                    if (hasJsQr) {
+                        var r = jsQrAllRotations(ctx, w, h);
+                        if (r) { submitCode(r); return; }
+                    }
+                    scanAnimId = requestAnimationFrame(scanFrame);
+                }).catch(function () {
+                    if (isScanning) scanAnimId = requestAnimationFrame(scanFrame);
+                });
+            } else if (hasJsQr) {
+                var r2 = jsQrAllRotations(ctx, w, h);
+                if (r2) { submitCode(r2); return; }
+                scanAnimId = requestAnimationFrame(scanFrame);
+            } else {
+                scanAnimId = requestAnimationFrame(scanFrame);
+            }
+        }
+
+        function startLiveCamera() {
+            document.getElementById('openCameraBtn').classList.add('d-none');
+            document.getElementById('cameraSection').classList.remove('d-none');
+
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width:  { min: 640, ideal: 1280 },
+                    height: { min: 480, ideal: 720 }
+                }
+            }).then(function (stream) {
+                videoStream = stream;
+                var video = document.getElementById('qr-video');
+                video.srcObject = stream;
+                video.play().then(function () { isScanning = true; scanFrame(); });
+            }).catch(function (err) {
+                stopCamera();
+                showFallback('Camera access denied (' + err.name + '). Use the file option below instead.');
+            });
+        }
+
+        // ── Still-image decoder (native capture or file upload) ──────────────
+        // Load via <img> element — the browser applies EXIF rotation automatically
+        // when rendering, so drawImage() gives us the visually-correct orientation.
+        // createImageBitmap with imageOrientation:'from-image' is unreliable on
+        // some Android Chrome versions and silently returns unrotated pixel data.
+        async function scanImageFile(file, resetFn) {
+            if (!file) return;
+            showResult('Loading image\u2026', 'info');
+
+            try {
+                // Show a preview so we can confirm what was captured
+                var previewUrl = URL.createObjectURL(file);
+                var preview = document.getElementById('capturePreview');
+                preview.src = previewUrl;
+                preview.classList.remove('d-none');
+
+                // Wait for the img element to finish decoding (applies EXIF rotation)
+                var img = await new Promise(function (resolve, reject) {
+                    var el = new Image();
+                    el.onload  = function () { resolve(el); };
+                    el.onerror = function () { reject(new Error('Image load failed')); };
+                    el.src = previewUrl;
+                });
+                // Don't revoke yet — let the preview stay visible
+
+                showResult('Image ' + img.naturalWidth + '\xd7' + img.naturalHeight + ' px \u2014 scanning\u2026', 'info');
+
+                // Try jsQR at multiple scales.
+                // Full resolution first; then halved (sometimes helps with large photos).
+                var scales = [1.0, 0.5, 0.25];
+                for (var si = 0; si < scales.length; si++) {
+                    var scale = scales[si];
+                    var sw = Math.round(img.naturalWidth  * scale);
+                    var sh = Math.round(img.naturalHeight * scale);
+                    if (sw < 200 || sh < 200) continue;
+
+                    var c = document.createElement('canvas');
+                    c.width = sw; c.height = sh;
+                    var ctx = c.getContext('2d');
+                    ctx.drawImage(img, 0, 0, sw, sh);
+
+                    if (hasJsQr) {
+                        var result = jsQrAllRotations(ctx, sw, sh);
+                        if (result) { URL.revokeObjectURL(previewUrl); submitCode(result); return; }
+                    }
+                }
+
+                URL.revokeObjectURL(previewUrl);
+                showResult(
+                    'No QR code found in captured image (' + img.naturalWidth + '\xd7' + img.naturalHeight + ' px). ' +
+                    'Check the preview above — is the QR code clearly visible? ' +
+                    'Move closer or enter the code manually.',
+                    'warning'
+                );
+            } catch (e) {
+                showResult('Error: ' + e.message, 'danger');
+            }
+
+            if (resetFn) resetFn();
+        }
+
+        // ── Button / input wiring ────────────────────────────────────────────
+        document.getElementById('openCameraBtn').addEventListener('click', function () {
+            document.getElementById('scanResult').classList.add('d-none');
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                startLiveCamera();
+            } else {
+                // HTTP over LAN IP — getUserMedia not available; open native camera
+                document.getElementById('nativeCameraInput').click();
+            }
+        });
+
+        document.getElementById('stopCameraBtn').addEventListener('click', stopCamera);
+
+        document.getElementById('nativeCameraInput').addEventListener('change', function (e) {
+            var input = this;
+            scanImageFile(e.target.files[0], function () { input.value = ''; });
+        });
+
+    </script>
+}

@@ -1,0 +1,88 @@
+@model SecurityPatrol.Web.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center" style="background: linear-gradient(135deg, #003087 0%, #0056d2 100%);">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-5 col-lg-4">
+                <div class="card shadow-lg border-0" style="border-radius: 16px; overflow: hidden;">
+                    <div class="card-header text-center py-4" style="background: #003087;">
+                        <div class="mb-2">
+                            <i class="fas fa-shield-halved text-white" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4 class="text-white mb-0 fw-bold">DRH Security</h4>
+                        <small class="text-white-50">Patrol Management System</small>
+                    </div>
+                    <div class="card-body p-4">
+                        <h5 class="text-center mb-4 text-muted">Sign In</h5>
+
+                        <form asp-action="Login" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" asp-for="ReturnUrl" />
+
+                            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small" role="alert"></div>
+
+                            <div class="mb-3">
+                                <label asp-for="Email" class="form-label fw-semibold">
+                                    <i class="fas fa-envelope me-1 text-muted"></i> Email Address
+                                </label>
+                                <input asp-for="Email" class="form-control form-control-lg" placeholder="officer@drhsecurity.com" autocomplete="email" />
+                                <span asp-validation-for="Email" class="text-danger small"></span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="Password" class="form-label fw-semibold">
+                                    <i class="fas fa-lock me-1 text-muted"></i> Password
+                                </label>
+                                <div class="input-group">
+                                    <input asp-for="Password" class="form-control form-control-lg" placeholder="Enter password" id="passwordInput" autocomplete="current-password" />
+                                    <button class="btn btn-outline-secondary" type="button" id="togglePassword" tabindex="-1">
+                                        <i class="fas fa-eye" id="eyeIcon"></i>
+                                    </button>
+                                </div>
+                                <span asp-validation-for="Password" class="text-danger small"></span>
+                            </div>
+
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input asp-for="RememberMe" class="form-check-input" />
+                                    <label asp-for="RememberMe" class="form-check-label text-muted">Remember me for 8 hours</label>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 fw-semibold">
+                                <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                            </button>
+                        </form>
+                    </div>
+                    <div class="card-footer text-center py-3 bg-light">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Authorized personnel only. All activity is logged.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScripts")
+    <script>
+        document.getElementById('togglePassword').addEventListener('click', function () {
+            var input = document.getElementById('passwordInput');
+            var icon = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        });
+    </script>
+}

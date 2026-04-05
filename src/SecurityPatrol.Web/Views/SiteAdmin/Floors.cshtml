@@ -1,0 +1,188 @@
+@model SecurityPatrol.Web.ViewModels.FloorsViewModel
+@{
+    ViewData["Title"] = "Floors";
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-layer-group me-2"></i>Floors</h2>
+            <small class="opacity-75">Manage building floors</small>
+        </div>
+        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createFloorModal">
+            <i class="fas fa-plus me-1"></i>New Floor
+        </button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb small">
+                    <li class="breadcrumb-item"><a href="/SiteAdmin/Buildings">Buildings</a></li>
+                    <li class="breadcrumb-item active">Floors</li>
+                    <li class="breadcrumb-item"><a href="/SiteAdmin/Locations">Locations</a></li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            @if (Model.Floors.Any())
+            {
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Floor Name</th>
+                            <th>Floor #</th>
+                            <th>Building</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in Model.Floors)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@f.Name</td>
+                                <td>@f.FloorNumber</td>
+                                <td class="small">@f.Building.Name</td>
+                                <td>
+                                    <span class="badge @(f.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(f.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1"
+                                            data-bs-toggle="modal" data-bs-target="#editFloorModal"
+                                            data-id="@f.Id" data-name="@f.Name"
+                                            data-buildingid="@f.BuildingId"
+                                            data-floornumber="@f.FloorNumber"
+                                            data-active="@f.IsActive.ToString().ToLower()">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <form method="post" asp-action="DeleteFloor" class="d-inline"
+                                          onsubmit="return confirm('Deactivate this floor?')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@f.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-layer-group fa-3x mb-3 opacity-25"></i>
+                    <p>No floors created yet.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Floor Modal -->
+<div class="modal fade" id="createFloorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-plus me-2"></i>New Floor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="CreateFloor">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Building <span class="text-danger">*</span></label>
+                        <select name="BuildingId" class="form-select" required>
+                            <option value="">-- Select Building --</option>
+                            @foreach (var b in Model.Buildings)
+                            {
+                                <option value="@b.Id">@b.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" required maxlength="100" placeholder="e.g. Ground Floor, Floor 2" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Number <span class="text-danger">*</span></label>
+                        <input type="number" name="FloorNumber" class="form-control" required value="1" />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="createFloorActive" checked />
+                        <label class="form-check-label" for="createFloorActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Floor Modal -->
+<div class="modal fade" id="editFloorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Floor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="EditFloor">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editFloorId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Building</label>
+                        <select name="BuildingId" id="editFloorBuilding" class="form-select" required>
+                            @foreach (var b in Model.Buildings)
+                            {
+                                <option value="@b.Id">@b.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Name</label>
+                        <input type="text" name="Name" id="editFloorName" class="form-control" required maxlength="100" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor Number</label>
+                        <input type="number" name="FloorNumber" id="editFloorNumber" class="form-control" required />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="editFloorActive" />
+                        <label class="form-check-label" for="editFloorActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('editFloorModal').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            document.getElementById('editFloorId').value = btn.dataset.id;
+            document.getElementById('editFloorName').value = btn.dataset.name;
+            document.getElementById('editFloorBuilding').value = btn.dataset.buildingid;
+            document.getElementById('editFloorNumber').value = btn.dataset.floornumber;
+            document.getElementById('editFloorActive').checked = btn.dataset.active === 'true';
+        });
+    </script>
+}

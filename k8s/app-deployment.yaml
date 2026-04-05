@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: security-patrol-app
+  namespace: security-patrol
+  labels:
+    app: security-patrol-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: security-patrol-app
+  template:
+    metadata:
+      labels:
+        app: security-patrol-app
+    spec:
+      containers:
+        - name: security-patrol-app
+          image: security-patrol-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: security-patrol-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: security-patrol-secrets
+                  key: connection-string
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/wwwroot/uploads
+            - name: dataprotection
+              mountPath: /app/dataprotection-keys
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 3
+      volumes:
+        - name: uploads
+          emptyDir: {}
+        - name: dataprotection
+          emptyDir: {}

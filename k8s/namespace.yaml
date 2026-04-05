@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security-patrol
+  labels:
+    app.kubernetes.io/name: security-patrol
+    app.kubernetes.io/managed-by: kubectl

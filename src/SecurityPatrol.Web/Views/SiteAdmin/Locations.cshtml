@@ -1,0 +1,223 @@
+@model SecurityPatrol.Web.ViewModels.LocationsViewModel
+@{
+    ViewData["Title"] = "Locations";
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Locations</h2>
+            <small class="opacity-75">Manage scan checkpoint locations</small>
+        </div>
+        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createLocationModal">
+            <i class="fas fa-plus me-1"></i>New Location
+        </button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb small">
+                    <li class="breadcrumb-item"><a href="/SiteAdmin/Buildings">Buildings</a></li>
+                    <li class="breadcrumb-item"><a href="/SiteAdmin/Floors">Floors</a></li>
+                    <li class="breadcrumb-item active">Locations</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            @if (Model.Locations.Any())
+            {
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Building</th>
+                            <th>Floor</th>
+                            <th>Description</th>
+                            <th>QR Code</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in Model.Locations)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@l.Name</td>
+                                <td class="small">@l.Building.Name</td>
+                                <td class="small">@(l.Floor?.Name ?? "-")</td>
+                                <td class="small text-muted">@(l.Description ?? "-")</td>
+                                <td><code class="small">@l.QrCode</code></td>
+                                <td>
+                                    <span class="badge @(l.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(l.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1"
+                                            data-bs-toggle="modal" data-bs-target="#editLocationModal"
+                                            data-id="@l.Id" data-name="@l.Name"
+                                            data-buildingid="@l.BuildingId"
+                                            data-floorid="@l.FloorId"
+                                            data-description="@l.Description"
+                                            data-active="@l.IsActive.ToString().ToLower()">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <form method="post" asp-action="DeleteLocation" class="d-inline"
+                                          onsubmit="return confirm('Deactivate this location?')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@l.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-map-marker-alt fa-3x mb-3 opacity-25"></i>
+                    <p>No locations created yet.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Location Modal -->
+<div class="modal fade" id="createLocationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-plus me-2"></i>New Location</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="CreateLocation">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Building <span class="text-danger">*</span></label>
+                        <select name="BuildingId" class="form-select" required id="createBuildingSelect">
+                            <option value="">-- Select Building --</option>
+                            @foreach (var b in Model.Buildings)
+                            {
+                                <option value="@b.Id">@b.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor</label>
+                        <select name="FloorId" class="form-select" id="createFloorSelect">
+                            <option value="">-- Select Floor --</option>
+                            @foreach (var f in Model.Floors)
+                            {
+                                <option value="@f.Id" data-building="@f.BuildingId">@f.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Location Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" required maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        <textarea name="Description" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="createLocActive" checked />
+                        <label class="form-check-label" for="createLocActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Location Modal -->
+<div class="modal fade" id="editLocationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Location</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="EditLocation">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editLocId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Building</label>
+                        <select name="BuildingId" id="editLocBuilding" class="form-select" required id="editBuildingSelect">
+                            @foreach (var b in Model.Buildings)
+                            {
+                                <option value="@b.Id">@b.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Floor</label>
+                        <select name="FloorId" id="editLocFloor" class="form-select">
+                            <option value="">-- No Floor --</option>
+                            @foreach (var f in Model.Floors)
+                            {
+                                <option value="@f.Id">@f.Name (@f.Building.Name)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Location Name</label>
+                        <input type="text" name="Name" id="editLocName" class="form-control" required maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        <textarea name="Description" id="editLocDesc" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="IsActive" value="true" class="form-check-input" id="editLocActive" />
+                        <label class="form-check-label" for="editLocActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('editLocationModal').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            document.getElementById('editLocId').value = btn.dataset.id;
+            document.getElementById('editLocName').value = btn.dataset.name;
+            document.getElementById('editLocBuilding').value = btn.dataset.buildingid;
+            document.getElementById('editLocFloor').value = btn.dataset.floorid || '';
+            document.getElementById('editLocDesc').value = btn.dataset.description || '';
+            document.getElementById('editLocActive').checked = btn.dataset.active === 'true';
+        });
+
+        document.getElementById('createBuildingSelect').addEventListener('change', function () {
+            var buildingId = this.value;
+            var floorSelect = document.getElementById('createFloorSelect');
+            Array.from(floorSelect.options).forEach(function (opt) {
+                opt.hidden = opt.value && opt.dataset.building !== buildingId;
+            });
+            floorSelect.value = '';
+        });
+    </script>
+}

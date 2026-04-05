@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - DRH Security Patrol</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <style>
+        :root {
+            --drh-navy: #003087;
+            --drh-navy-dark: #001f5a;
+            --drh-accent: #0056d2;
+        }
+        body { background-color: #f4f6fa; min-height: 100vh; }
+        .navbar-brand .brand-text { font-weight: 700; letter-spacing: 0.5px; }
+        .navbar { background-color: var(--drh-navy) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .navbar .nav-link { color: rgba(255,255,255,0.85) !important; font-weight: 500; }
+        .navbar .nav-link:hover, .navbar .nav-link.active { color: #ffffff !important; }
+        .navbar-brand { color: #ffffff !important; }
+        .badge-status-inprogress { background-color: #ffc107; color: #212529; }
+        .badge-status-completed { background-color: #198754; }
+        .badge-status-incomplete { background-color: #dc3545; }
+        .card { border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border-radius: 10px; }
+        .card-header { border-radius: 10px 10px 0 0 !important; }
+        .btn-primary { background-color: var(--drh-navy); border-color: var(--drh-navy); }
+        .btn-primary:hover { background-color: var(--drh-navy-dark); border-color: var(--drh-navy-dark); }
+        .page-header { background: linear-gradient(135deg, var(--drh-navy), var(--drh-accent)); color: #fff; padding: 1.5rem 0; margin-bottom: 1.5rem; }
+        .alert-flash { position: fixed; top: 70px; right: 20px; z-index: 9999; min-width: 300px; }
+        footer { background-color: var(--drh-navy); color: rgba(255,255,255,0.7); padding: 1rem 0; margin-top: 3rem; }
+        .sidebar { background: #fff; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 1rem; }
+        .progress { height: 12px; border-radius: 6px; }
+        .location-card-scanned { border-left: 4px solid #198754; }
+        .location-card-pending { border-left: 4px solid #6c757d; }
+        .qr-print-item { break-inside: avoid; margin-bottom: 20px; }
+        @@media print {
+            .no-print { display: none !important; }
+            .navbar, footer, .btn { display: none !important; }
+            .qr-print-item { border: 1px solid #ccc; padding: 10px; }
+        }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex align-items-center" href="/">
+                    <i class="fas fa-shield-halved me-2 fs-5"></i>
+                    <span class="brand-text">DRH Security Patrol</span>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    @await Html.PartialAsync("_Navigation")
+                    <div class="ms-auto d-flex align-items-center">
+                        <span class="text-white-50 me-3 small">
+                            <i class="fas fa-user-circle me-1"></i>
+                            @User.Identity.Name
+                        </span>
+                        <form method="post" action="/Account/Logout" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-light btn-sm">
+                                <i class="fas fa-sign-out-alt me-1"></i>Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    }
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show alert-flash" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show alert-flash" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Warning"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show alert-flash" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>@TempData["Warning"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <main>
+        @RenderBody()
+    </main>
+
+    <footer class="no-print">
+        <div class="container text-center">
+            <small>&copy; @DateTime.Now.Year DRH Security &mdash; Security Patrol Management System</small>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script>
+        // Auto-dismiss flash messages after 5 seconds
+        setTimeout(function () {
+            document.querySelectorAll('.alert-flash').forEach(function (el) {
+                var alert = bootstrap.Alert.getOrCreateInstance(el);
+                if (alert) alert.close();
+            });
+        }, 5000);
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

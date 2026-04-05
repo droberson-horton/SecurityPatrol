@@ -1,0 +1,377 @@
+@model SecurityPatrol.Web.ViewModels.ScheduleViewModel
+@using SecurityPatrol.Web.Models
+@{
+    ViewData["Title"] = "Schedules";
+    var templates = ViewBag.Templates as List<ScheduleTemplate> ?? new List<ScheduleTemplate>();
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Patrol Schedules</h2>
+            <small class="opacity-75">Assign patrol schedules to officers</small>
+        </div>
+        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createScheduleModal">
+            <i class="fas fa-plus me-1"></i>New Schedule
+        </button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Officer</label>
+                    <select name="officerId" class="form-select form-select-sm">
+                        <option value="">All Officers</option>
+                        @foreach (var o in Model.Officers)
+                        {
+                            <option value="@o.Id" selected="@(Model.FilterOfficerId == o.Id)">@o.FullName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">From</label>
+                    <input type="date" name="fromDate" class="form-control form-control-sm"
+                           value="@Model.FilterFromDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">To</label>
+                    <input type="date" name="toDate" class="form-control form-control-sm"
+                           value="@Model.FilterToDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Status</label>
+                    <select name="completed" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="false" selected="@(Model.FilterCompleted == false)">Pending</option>
+                        <option value="true" selected="@(Model.FilterCompleted == true)">Completed</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">Filter</button>
+                    <a href="/Admin/Schedules" class="btn btn-outline-secondary btn-sm flex-fill">Clear</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            @if (Model.Schedules.Any())
+            {
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Officer</th>
+                            <th>Route</th>
+                            <th>Notes</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Schedules)
+                        {
+                            <tr>
+                                <td>@s.ScheduledDate.ToString("MM/dd/yyyy")</td>
+                                <td class="small">@s.StartTime.ToString(@"hh\:mm") - @s.EndTime.ToString(@"hh\:mm")</td>
+                                <td class="fw-semibold small">@s.Officer.FullName</td>
+                                <td class="small">@s.PatrolRoute.Name</td>
+                                <td class="small text-muted">@(s.Notes ?? "-")</td>
+                                <td>
+                                    @if (s.IsCompleted)
+                                    {
+                                        <span class="badge bg-success">Completed</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1"
+                                            data-bs-toggle="modal" data-bs-target="#editScheduleModal"
+                                            data-id="@s.Id"
+                                            data-officerid="@s.OfficerId"
+                                            data-routeid="@s.PatrolRouteId"
+                                            data-date="@s.ScheduledDate.ToString("yyyy-MM-dd")"
+                                            data-start="@s.StartTime.ToString(@"hh\:mm")"
+                                            data-end="@s.EndTime.ToString(@"hh\:mm")"
+                                            data-notes="@s.Notes">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <form method="post" asp-action="DeleteSchedule" class="d-inline"
+                                          onsubmit="return confirm('Delete this schedule?')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@s.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
+                    <p>No schedules found.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Schedule Modal -->
+<div class="modal fade" id="createScheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-calendar-plus me-2"></i>New Schedule</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="CreateSchedule">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    @if (templates.Any())
+                    {
+                        <div class="mb-3 p-3 bg-light rounded border">
+                            <label class="form-label fw-semibold"><i class="fas fa-clipboard-list me-1 text-primary"></i>Apply Template (optional)</label>
+                            <select name="templateId" id="createSchedTemplate" class="form-select mb-2">
+                                <option value="">-- No Template (manual) --</option>
+                                @foreach (var t in templates)
+                                {
+                                    <option value="@t.Id"
+                                            data-slots='@System.Text.Json.JsonSerializer.Serialize(t.Slots.OrderBy(s => s.OrderIndex).Select(s => new { s.Label, start = s.StartTime.ToString(@"hh\:mm"), end = s.EndTime.ToString(@"hh\:mm"), route = s.PatrolRoute?.Name ?? "No route" }))'>
+                                        @t.Name (@t.Slots.Count slot(s))
+                                    </option>
+                                }
+                            </select>
+                            <div id="templatePreview" class="d-none">
+                                <small class="text-muted fw-semibold">Template slots preview:</small>
+                                <ul id="templateSlotsList" class="list-unstyled mb-0 mt-1 small"></ul>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Officer <span class="text-danger">*</span></label>
+                        <select name="OfficerId" class="form-select" required>
+                            <option value="">-- Select Officer --</option>
+                            @foreach (var o in Model.Officers)
+                            {
+                                <option value="@o.Id">@o.FullName</option>
+                            }
+                        </select>
+                    </div>
+                    <div id="manualRouteSection">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Patrol Route <span class="text-danger">*</span></label>
+                            <select name="WalkRouteId" id="createSchedRoute" class="form-select">
+                                <option value="">-- Select Route --</option>
+                                @foreach (var r in Model.Routes)
+                                {
+                                    <option value="@r.Id">@r.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Start Time</label>
+                                <input type="time" name="StartTime" id="createSchedStart" class="form-control" value="08:00" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">End Time</label>
+                                <input type="time" name="EndTime" id="createSchedEnd" class="form-control" value="09:00" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <textarea name="Notes" class="form-control" rows="2" maxlength="1000"></textarea>
+                        </div>
+                    </div>
+                    <!-- Date range — used for both manual and template modes -->
+                    <div class="row g-3 mb-2">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">From Date <span class="text-danger">*</span></label>
+                            <input type="date" name="schedFromDate" id="createSchedFromDate" class="form-control" required
+                                   value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">To Date <span class="text-danger">*</span></label>
+                            <input type="date" name="schedToDate" id="createSchedToDate" class="form-control" required
+                                   value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+                    </div>
+                    <div id="dateRangeSummary" class="alert alert-info py-2 small mb-0 d-none">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <span id="dateRangeSummaryText"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Create Schedule
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Schedule Modal -->
+<div class="modal fade" id="editScheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Schedule</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-action="EditSchedule">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editSchedId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Officer</label>
+                        <select name="OfficerId" id="editSchedOfficer" class="form-select" required>
+                            @foreach (var o in Model.Officers)
+                            {
+                                <option value="@o.Id">@o.FullName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Patrol Route</label>
+                        <select name="WalkRouteId" id="editSchedRoute" class="form-select" required>
+                            @foreach (var r in Model.Routes)
+                            {
+                                <option value="@r.Id">@r.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Date</label>
+                        <input type="date" name="ScheduledDate" id="editSchedDate" class="form-control" required />
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Start Time</label>
+                            <input type="time" name="StartTime" id="editSchedStart" class="form-control" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">End Time</label>
+                            <input type="time" name="EndTime" id="editSchedEnd" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label fw-semibold">Notes</label>
+                        <textarea name="Notes" id="editSchedNotes" class="form-control" rows="2" maxlength="1000"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('editScheduleModal').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            document.getElementById('editSchedId').value = btn.dataset.id;
+            document.getElementById('editSchedOfficer').value = btn.dataset.officerid;
+            document.getElementById('editSchedRoute').value = btn.dataset.routeid;
+            document.getElementById('editSchedDate').value = btn.dataset.date;
+            document.getElementById('editSchedStart').value = btn.dataset.start;
+            document.getElementById('editSchedEnd').value = btn.dataset.end;
+            document.getElementById('editSchedNotes').value = btn.dataset.notes || '';
+        });
+
+        var fromDateInput   = document.getElementById('createSchedFromDate');
+        var toDateInput     = document.getElementById('createSchedToDate');
+        var activeSlotCount = 0; // 0 = manual mode
+        var templateSelect  = document.getElementById('createSchedTemplate');
+
+        function updateDateRangeSummary() {
+            var summary     = document.getElementById('dateRangeSummary');
+            var summaryText = document.getElementById('dateRangeSummaryText');
+            var from = fromDateInput.value;
+            var to   = toDateInput.value;
+            if (!from || !to || from > to) {
+                summary.classList.add('d-none');
+                return;
+            }
+            var days = Math.round((new Date(to + 'T00:00:00') - new Date(from + 'T00:00:00')) / 86400000) + 1;
+            if (activeSlotCount > 0) {
+                // template mode
+                summaryText.textContent = days + ' day(s) × ' + activeSlotCount + ' slot(s) = ' + (days * activeSlotCount) + ' schedule(s) will be created.';
+            } else {
+                // manual mode
+                summaryText.textContent = days === 1 ? '1 day selected.' : days + ' day(s) selected — 1 schedule per day.';
+            }
+            summary.classList.remove('d-none');
+        }
+
+        fromDateInput.addEventListener('change', updateDateRangeSummary);
+        toDateInput.addEventListener('change', updateDateRangeSummary);
+        updateDateRangeSummary();
+
+        if (templateSelect) {
+            templateSelect.addEventListener('change', function () {
+                var selected      = this.options[this.selectedIndex];
+                var preview       = document.getElementById('templatePreview');
+                var list          = document.getElementById('templateSlotsList');
+                var manualSection = document.getElementById('manualRouteSection');
+                var routeSelect   = document.getElementById('createSchedRoute');
+                var startInput    = document.getElementById('createSchedStart');
+                var endInput      = document.getElementById('createSchedEnd');
+
+                if (!this.value) {
+                    preview.classList.add('d-none');
+                    manualSection.style.display = '';
+                    if (routeSelect) routeSelect.required = true;
+                    if (startInput)  startInput.required  = true;
+                    if (endInput)    endInput.required    = true;
+                    activeSlotCount = 0;
+                    updateDateRangeSummary();
+                    return;
+                }
+
+                manualSection.style.display = 'none';
+                if (routeSelect) routeSelect.required = false;
+                if (startInput)  startInput.required  = false;
+                if (endInput)    endInput.required    = false;
+
+                try {
+                    var slotsData = JSON.parse(selected.dataset.slots || '[]');
+                    activeSlotCount = slotsData.filter(function(s) { return s.route !== 'No route'; }).length;
+                    list.innerHTML = '';
+                    slotsData.forEach(function (slot) {
+                        var li = document.createElement('li');
+                        li.innerHTML = '<i class="fas fa-clock me-1 text-info"></i><strong>' + slot.Label + '</strong> ' +
+                            slot.start + '–' + slot.end + ' <span class="text-muted">(' + slot.route + ')</span>';
+                        list.appendChild(li);
+                    });
+                    preview.classList.remove('d-none');
+                } catch (ex) {
+                    preview.classList.add('d-none');
+                    activeSlotCount = 0;
+                }
+
+                updateDateRangeSummary();
+            });
+        }
+    </script>
+}
