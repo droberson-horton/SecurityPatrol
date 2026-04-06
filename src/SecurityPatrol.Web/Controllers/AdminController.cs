@@ -350,7 +350,8 @@ public class AdminController : Controller
         var routes = await _db.PatrolRoutes
             .Include(r => r.PatrolRouteLocations)
                 .ThenInclude(wrl => wrl.Location)
-            .OrderBy(r => r.Name)
+            .OrderBy(r => r.SortOrder)
+            .ThenBy(r => r.Name)
             .ToListAsync();
         var vm = new PatrolRouteViewModel { Routes = routes };
         return View(vm);
@@ -477,6 +478,20 @@ public class AdminController : Controller
         await _db.SaveChangesAsync();
         TempData["Success"] = "Route deactivated.";
         return RedirectToAction(nameof(Routes));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReorderRoutes([FromBody] List<int> routeIds)
+    {
+        for (int i = 0; i < routeIds.Count; i++)
+        {
+            var route = await _db.PatrolRoutes.FindAsync(routeIds[i]);
+            if (route != null)
+                route.SortOrder = i;
+        }
+        await _db.SaveChangesAsync();
+        return Ok();
     }
 
     // ---- Schedule Templates ----

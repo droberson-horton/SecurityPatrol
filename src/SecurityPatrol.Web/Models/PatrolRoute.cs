@@ -15,6 +15,8 @@ public class PatrolRoute
 
     public bool IsActive { get; set; } = true;
 
+    public int SortOrder { get; set; } = 0;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<PatrolRouteLocation> PatrolRouteLocations { get; set; } = new List<PatrolRouteLocation>();

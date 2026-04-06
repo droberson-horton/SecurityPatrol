@@ -119,6 +119,7 @@
                                     <th>Building</th>
                                     <th>Scanned At</th>
                                     <th>Notes</th>
+                                    <th>Photo</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -132,6 +133,18 @@
                                         <td class="small">@scan.BuildingName</td>
                                         <td class="small">@scan.ScannedAt.ToLocalTime().ToString("HH:mm:ss")</td>
                                         <td class="small text-muted">@(scan.Notes ?? "")</td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(scan.PhotoPath))
+                                            {
+                                                <a href="@scan.PhotoPath" target="_blank">
+                                                    <img src="@scan.PhotoPath" class="rounded" style="height:48px; object-fit:cover;" alt="Photo" />
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">—</span>
+                                            }
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
