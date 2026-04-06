@@ -17,7 +17,7 @@
 }
 
 <ul class="navbar-nav">
-    @if (IsAdmin || IsOfficer)
+    @if (IsOfficer && !IsAdmin)
     {
         <li class="nav-item">
             <a class="nav-link @(IsActive("Dashboard", "Officer") ? "active" : "")" href="/Dashboard/Officer">
@@ -26,16 +26,7 @@
         </li>
     }
 
-    @if (IsAuditor && !IsAdmin)
-    {
-        <li class="nav-item">
-            <a class="nav-link @(IsActive("Audit", "Index") ? "active" : "")" href="/Audit">
-                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
-            </a>
-        </li>
-    }
-
-    @if (IsOfficer || IsAdmin)
+@if (IsOfficer && !IsAdmin)
     {
         <li class="nav-item">
             <a class="nav-link @(IsActive("Patrol", "Start") ? "active" : "")" href="/Patrol/Start">
@@ -64,23 +55,18 @@
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                    <a class="dropdown-item" href="/SiteAdmin">
-                        <i class="fas fa-building me-2"></i>Site Admin
-                    </a>
-                </li>
-                <li>
                     <a class="dropdown-item" href="/Admin/Users">
                         <i class="fas fa-users me-2"></i>User Admin
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item" href="/Admin/Schedules">
-                        <i class="fas fa-calendar-alt me-2"></i>Schedules
+                    <a class="dropdown-item" href="/SiteAdmin">
+                        <i class="fas fa-building me-2"></i>Site Admin
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item" href="/Admin/ScheduleTemplates">
-                        <i class="fas fa-clipboard-list me-2"></i>Schedule Templates
+                    <a class="dropdown-item" href="/Admin/Schedules">
+                        <i class="fas fa-calendar-alt me-2"></i>Schedules
                     </a>
                 </li>
                 <li>
@@ -94,16 +80,16 @@
                     </a>
                 </li>
                 <li>
+                    <a class="dropdown-item" href="/Admin/ScheduleTemplates">
+                        <i class="fas fa-clipboard-list me-2"></i>Schedule Templates
+                    </a>
+                </li>
+                <li>
                     <a class="dropdown-item" href="/Admin/Messages">
                         <i class="fas fa-bell me-2"></i>Messages
                     </a>
                 </li>
             </ul>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link @(IsActive("Audit") ? "active" : "")" href="/Audit">
-                <i class="fas fa-search me-1"></i>Audit
-            </a>
         </li>
     }
 
@@ -114,13 +100,5 @@
                 <i class="fas fa-chart-bar me-1"></i>Reports
             </a>
         </li>
-        @if (IsAuditor && !IsAdmin)
-        {
-            <li class="nav-item">
-                <a class="nav-link @(IsActive("Audit", "PatrolHistory") ? "active" : "")" href="/Audit/PatrolHistory">
-                    <i class="fas fa-history me-1"></i>Patrol History
-                </a>
-            </li>
-        }
     }
 </ul>

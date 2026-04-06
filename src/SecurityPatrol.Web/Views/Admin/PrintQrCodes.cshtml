@@ -20,13 +20,16 @@
         .location-detail { color: #666; font-size: 11px; margin: 4px 0; }
         .qr-code { font-size: 9px; color: #999; word-break: break-all; margin-top: 4px; }
         .print-btn { position: fixed; top: 10px; right: 10px; background: #003087; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .back-btn { position: fixed; top: 10px; left: 10px; background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; text-decoration: none; }
         @@media print {
             .print-btn { display: none; }
+            .back-btn { display: none; }
             .header { border-color: #000; }
         }
     </style>
 </head>
 <body>
+    <a href="javascript:history.back()" class="back-btn">&#8592; Back</a>
     <button class="print-btn" onclick="window.print()">Print</button>
     <div class="header">
         <h1>DRH Security &mdash; Location QR Codes</h1>

@@ -7,4 +7,5 @@ public interface IReportService
 {
     Task<HistoryReportViewModel> GetHistoryReportAsync(PatrolFilters filters);
     Task<RoleReportViewModel> GetRoleReportAsync();
+    Task<MissedReportViewModel> GetMissedReportAsync(PatrolFilters filters);
 }

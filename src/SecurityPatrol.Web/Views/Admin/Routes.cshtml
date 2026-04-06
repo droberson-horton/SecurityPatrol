@@ -9,9 +9,12 @@
             <h2 class="mb-0"><i class="fas fa-route me-2"></i>Patrol Routes</h2>
             <small class="opacity-75">Define patrol routes and location ordering</small>
         </div>
-        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createRouteModal">
-            <i class="fas fa-plus me-1"></i>New Route
-        </button>
+        <div class="d-flex gap-2">
+            @await Html.PartialAsync("_DashboardButton")
+            <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createRouteModal">
+                <i class="fas fa-plus me-1"></i>New Route
+            </button>
+        </div>
     </div>
 </div>
 

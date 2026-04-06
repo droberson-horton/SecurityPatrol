@@ -11,13 +11,40 @@
             <h2 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Patrol Schedules</h2>
             <small class="opacity-75">Assign patrol schedules to officers</small>
         </div>
-        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createScheduleModal">
-            <i class="fas fa-plus me-1"></i>New Schedule
-        </button>
+        <div class="d-flex align-items-center gap-2">
+            @await Html.PartialAsync("_DashboardButton")
+            <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createScheduleModal">
+                <i class="fas fa-plus me-1"></i>New Schedule
+            </button>
+        </div>
     </div>
 </div>
 
 <div class="container">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="btn-group" role="group" aria-label="View toggle">
+            <button type="button" class="btn btn-outline-secondary active" id="btnListView">
+                <i class="fas fa-list me-1"></i>List
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btnCalView">
+                <i class="fas fa-calendar me-1"></i>Calendar
+            </button>
+        </div>
+        <div id="calSubControls" class="d-none d-flex align-items-center gap-2 flex-wrap">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-primary" id="btnDay">Day</button>
+                <button type="button" class="btn btn-outline-primary" id="btnWeek">Week</button>
+                <button type="button" class="btn btn-outline-primary active" id="btnMonth">Month</button>
+                <button type="button" class="btn btn-outline-primary" id="btnRange">Range</button>
+            </div>
+            <div id="rangeInputs" class="d-none d-flex gap-2 align-items-center">
+                <input type="date" id="calRangeFrom" class="form-control form-control-sm" style="width:140px;" />
+                <span class="text-muted small">to</span>
+                <input type="date" id="calRangeTo" class="form-control form-control-sm" style="width:140px;" />
+            </div>
+        </div>
+    </div>
+
     <div class="card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
@@ -57,6 +84,7 @@
         </div>
     </div>
 
+    <div id="listViewContainer">
     <div class="card">
         <div class="card-body p-0">
             @if (Model.Schedules.Any())
@@ -125,6 +153,15 @@
                     <p>No schedules found.</p>
                 </div>
             }
+        </div>
+    </div>
+    </div><!-- /listViewContainer -->
+
+    <div id="calendarContainer" class="d-none">
+        <div class="card">
+            <div class="card-body p-2">
+                <div id="calendarView"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -287,6 +324,132 @@
 </div>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script>
+        // ---- Build events from server-rendered schedules ----
+        var scheduleEvents = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Schedules.Select(s => new {
+                id        = s.Id.ToString(),
+                title     = s.Officer.FullName + " — " + s.PatrolRoute.Name,
+                start     = s.ScheduledDate.ToString("yyyy-MM-dd") + "T" + s.StartTime.ToString(@"hh\:mm\:ss"),
+                end       = s.ScheduledDate.ToString("yyyy-MM-dd") + "T" + s.EndTime.ToString(@"hh\:mm\:ss"),
+                color     = s.IsCompleted ? "#198754" : "#e0a800",
+                textColor = s.IsCompleted ? "#ffffff" : "#212529",
+                extendedProps = new {
+                    schedId   = s.Id,
+                    officerId = s.OfficerId,
+                    routeId   = s.PatrolRouteId,
+                    date      = s.ScheduledDate.ToString("yyyy-MM-dd"),
+                    startT    = s.StartTime.ToString(@"hh\:mm"),
+                    endT      = s.EndTime.ToString(@"hh\:mm"),
+                    notes     = s.Notes ?? ""
+                }
+            })
+        ));
+
+        // ---- FullCalendar init ----
+        var calendarEl = document.getElementById('calendarView');
+        var defaultToolbar = { left: 'prev,next today', center: 'title', right: '' };
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: defaultToolbar,
+            buttonText: { today: 'Today' },
+            height: 'auto',
+            events: scheduleEvents,
+            eventClick: function(info) {
+                var p = info.event.extendedProps;
+                document.getElementById('editSchedId').value      = p.schedId;
+                document.getElementById('editSchedOfficer').value = p.officerId;
+                document.getElementById('editSchedRoute').value   = p.routeId;
+                document.getElementById('editSchedDate').value    = p.date;
+                document.getElementById('editSchedStart').value   = p.startT;
+                document.getElementById('editSchedEnd').value     = p.endT;
+                document.getElementById('editSchedNotes').value   = p.notes;
+                new bootstrap.Modal(document.getElementById('editScheduleModal')).show();
+            }
+        });
+
+        // ---- View toggle ----
+        var listContainer = document.getElementById('listViewContainer');
+        var calContainer  = document.getElementById('calendarContainer');
+        var calSubCtrls   = document.getElementById('calSubControls');
+
+        function showList() {
+            listContainer.classList.remove('d-none');
+            calContainer.classList.add('d-none');
+            calSubCtrls.classList.add('d-none');
+            document.getElementById('btnListView').classList.add('active');
+            document.getElementById('btnCalView').classList.remove('active');
+            localStorage.setItem('schedPageView', 'list');
+        }
+
+        function showCalendar() {
+            listContainer.classList.add('d-none');
+            calContainer.classList.remove('d-none');
+            calSubCtrls.classList.remove('d-none');
+            document.getElementById('btnCalView').classList.add('active');
+            document.getElementById('btnListView').classList.remove('active');
+            calendar.render();
+            localStorage.setItem('schedPageView', 'calendar');
+        }
+
+        document.getElementById('btnListView').addEventListener('click', showList);
+        document.getElementById('btnCalView').addEventListener('click', showCalendar);
+
+        // ---- Calendar sub-view buttons ----
+        function setActiveCalBtn(btn) {
+            ['btnDay','btnWeek','btnMonth','btnRange'].forEach(function(id) {
+                document.getElementById(id).classList.remove('active');
+            });
+            btn.classList.add('active');
+        }
+
+        function leaveRangeMode() {
+            document.getElementById('rangeInputs').classList.add('d-none');
+            calendar.setOption('headerToolbar', defaultToolbar);
+        }
+
+        document.getElementById('btnDay').addEventListener('click', function() {
+            leaveRangeMode();
+            calendar.changeView('timeGridDay');
+            setActiveCalBtn(this);
+        });
+        document.getElementById('btnWeek').addEventListener('click', function() {
+            leaveRangeMode();
+            calendar.changeView('timeGridWeek');
+            setActiveCalBtn(this);
+        });
+        document.getElementById('btnMonth').addEventListener('click', function() {
+            leaveRangeMode();
+            calendar.changeView('dayGridMonth');
+            setActiveCalBtn(this);
+        });
+        document.getElementById('btnRange').addEventListener('click', function() {
+            document.getElementById('rangeInputs').classList.remove('d-none');
+            calendar.setOption('headerToolbar', { left: '', center: 'title', right: '' });
+            setActiveCalBtn(this);
+            applyRange();
+        });
+
+        function applyRange() {
+            var from = document.getElementById('calRangeFrom').value;
+            var to   = document.getElementById('calRangeTo').value;
+            if (from && to && from <= to) {
+                // end is exclusive in FullCalendar — add one day
+                var toDate = new Date(to + 'T00:00:00');
+                toDate.setDate(toDate.getDate() + 1);
+                var toExclusive = toDate.toISOString().slice(0, 10);
+                calendar.changeView('dayGrid', { start: from, end: toExclusive });
+            }
+        }
+        document.getElementById('calRangeFrom').addEventListener('change', applyRange);
+        document.getElementById('calRangeTo').addEventListener('change', applyRange);
+
+        // ---- Restore last view from localStorage ----
+        if (localStorage.getItem('schedPageView') === 'calendar') {
+            showCalendar();
+        }
+    </script>
     <script>
         document.getElementById('editScheduleModal').addEventListener('show.bs.modal', function (event) {
             var btn = event.relatedTarget;

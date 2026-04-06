@@ -11,6 +11,7 @@
             <small class="opacity-75">@Model.TotalPatrols patrols found</small>
         </div>
         <div class="d-flex gap-2">
+            @await Html.PartialAsync("_DashboardButton")
             <a href="@(Context.Request.Path)?@(Context.Request.QueryString.Value?.TrimStart('?'))&export=true"
                class="btn btn-light">
                 <i class="fas fa-file-csv me-1"></i>Export CSV
@@ -123,7 +124,7 @@
                         @foreach (var patrol in Model.Patrols)
                         {
                             var duration = patrol.Duration;
-                            <tr>
+                            <tr style="cursor:pointer;" onclick="window.location='/Report/Detail/@patrol.PatrolId'">
                                 <td class="small text-muted">#@patrol.PatrolId</td>
                                 <td class="small fw-semibold">@patrol.OfficerName</td>
                                 <td class="small">@(patrol.RouteName ?? "Ad-hoc")</td>

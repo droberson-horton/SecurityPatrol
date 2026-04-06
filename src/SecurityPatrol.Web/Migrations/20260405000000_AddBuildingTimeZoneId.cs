@@ -24,4 +24,3 @@ using Microsoft.EntityFrameworkCore.Migrations;
           }
       }
   }
-  EOF

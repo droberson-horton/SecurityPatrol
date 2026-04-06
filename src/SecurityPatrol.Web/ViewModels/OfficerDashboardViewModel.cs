@@ -16,6 +16,9 @@ public class MissedLocationItem
 {
     public int ScheduledPatrolId { get; set; }
     public DateTime ScheduledDate { get; set; }
+    public TimeSpan ScheduledStartTime { get; set; }
+    public TimeSpan ScheduledEndTime { get; set; }
+    public string OfficerId { get; set; } = string.Empty;
     public string OfficerName { get; set; } = string.Empty;
     public string RouteName { get; set; } = string.Empty;
     public string LocationName { get; set; } = string.Empty;

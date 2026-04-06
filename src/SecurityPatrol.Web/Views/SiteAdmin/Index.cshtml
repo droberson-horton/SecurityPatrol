@@ -14,9 +14,12 @@
             <h2 class="mb-0"><i class="fas fa-building me-2"></i>Site Administration</h2>
             <small class="opacity-75">Manage buildings, floors, and locations</small>
         </div>
-        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addBuildingModal">
-            <i class="fas fa-plus me-1"></i>Add Building
-        </button>
+        <div class="d-flex gap-2">
+            @await Html.PartialAsync("_DashboardButton")
+            <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addBuildingModal">
+                <i class="fas fa-plus me-1"></i>Add Building
+            </button>
+        </div>
     </div>
 </div>
 
@@ -45,16 +48,17 @@
     }
     else
     {
-        <div class="accordion" id="buildingAccordion">
+        <div id="buildingAccordion">
             @foreach (var building in Model.BuildingTree)
             {
                 var bId = $"building-{building.Id}";
                 var isOpen = openId == building.Id.ToString();
-                <div class="accordion-item mb-3 border rounded shadow-sm">
+                <div class="accordion-item mb-3 border rounded shadow-sm" data-id="@building.Id">
                     <h2 class="accordion-header" id="heading-@building.Id">
                         <button class="accordion-button @(isOpen ? "" : "collapsed") fw-semibold" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#@bId"
                                 aria-expanded="@(isOpen ? "true" : "false")" aria-controls="@bId">
+                            <i class="fas fa-grip-vertical text-muted me-2 building-drag-handle" style="cursor:grab;" title="Drag to reorder"></i>
                             <i class="fas fa-building me-2 text-primary"></i>
                             @building.Name
                             @if (!string.IsNullOrEmpty(building.Address))
@@ -446,7 +450,36 @@
 </div>
 
 @section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script>
+        // Building drag-to-reorder
+        var buildingList = document.getElementById('buildingAccordion');
+        if (buildingList) {
+            new Sortable(buildingList, {
+                animation: 150,
+                handle: '.building-drag-handle',
+                ghostClass: 'bg-light',
+                onEnd: function () {
+                    var ids = Array.from(buildingList.querySelectorAll('[data-id]'))
+                        .map(function (el) { return parseInt(el.dataset.id); });
+
+                    fetch('/SiteAdmin/ReorderBuildings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        },
+                        body: JSON.stringify(ids)
+                    });
+                }
+            });
+
+            // Prevent drag handle click from toggling accordion
+            document.querySelectorAll('.building-drag-handle').forEach(function (handle) {
+                handle.addEventListener('click', function (e) { e.stopPropagation(); });
+            });
+        }
+
         // Edit Building Modal
         document.getElementById('editBuildingModal').addEventListener('show.bs.modal', function (e) {
             var btn = e.relatedTarget;

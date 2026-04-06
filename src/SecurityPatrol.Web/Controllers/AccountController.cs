@@ -74,7 +74,7 @@ public class AccountController : Controller
             {
                 UserRole.Administrator => RedirectToAction("Index", "Admin"),
                 UserRole.SecurityOfficer => RedirectToAction("Officer", "Dashboard"),
-                UserRole.Auditor => RedirectToAction("Index", "Audit"),
+                UserRole.Auditor => RedirectToAction("Index", "Report"),
                 _ => RedirectToAction("Officer", "Dashboard")
             };
         }
@@ -112,7 +112,7 @@ public class AccountController : Controller
         if (User.HasClaim(ClaimTypes.Role, UserRole.Administrator.ToString()))
             return RedirectToAction("Index", "Admin");
         if (User.HasClaim(ClaimTypes.Role, UserRole.Auditor.ToString()))
-            return RedirectToAction("Index", "Audit");
+            return RedirectToAction("Index", "Report");
         return RedirectToAction("Officer", "Dashboard");
     }
 }

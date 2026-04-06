@@ -15,17 +15,20 @@
             <h2 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code Generator</h2>
             <small class="opacity-75">Generate and print QR codes for scan locations</small>
         </div>
-        @if (locations.Any())
-        {
-            <a asp-action="PrintQrCodes"
-               asp-route-buildingId="@selectedBuildingId"
-               asp-route-floorId="@selectedFloorId"
-               asp-route-locationId="@selectedLocationId"
-               target="_blank"
-               class="btn btn-light">
-                <i class="fas fa-print me-1"></i>Print QR Codes
-            </a>
-        }
+        <div class="d-flex gap-2">
+            @await Html.PartialAsync("_DashboardButton")
+            @if (locations.Any())
+            {
+                <a asp-action="PrintQrCodes"
+                   asp-route-buildingId="@selectedBuildingId"
+                   asp-route-floorId="@selectedFloorId"
+                   asp-route-locationId="@selectedLocationId"
+                   target="_blank"
+                   class="btn btn-light">
+                    <i class="fas fa-print me-1"></i>Print QR Codes
+                </a>
+            }
+        </div>
     </div>
 </div>
 

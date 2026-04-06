@@ -11,9 +11,7 @@
             <h2 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Edit Template: @Model.Name</h2>
             <small class="opacity-75">Manage time slots for this schedule template</small>
         </div>
-        <a href="/Admin/ScheduleTemplates" class="btn btn-outline-light">
-            <i class="fas fa-arrow-left me-1"></i>Back to Templates
-        </a>
+        @await Html.PartialAsync("_DashboardButton")
     </div>
 </div>
 

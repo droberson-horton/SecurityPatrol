@@ -1,0 +1,188 @@
+@model SecurityPatrol.Web.ViewModels.MissedReportViewModel
+@{
+    ViewData["Title"] = "Missed Report";
+    var qs = Context.Request.QueryString.Value ?? "";
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Missed Report</h2>
+            <small class="opacity-75">Locations not scanned during scheduled patrol windows</small>
+        </div>
+        @await Html.PartialAsync("_DashboardButton")
+    </div>
+</div>
+
+<div class="container">
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="/Report/MissedReport" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small">From Date</label>
+                    <input type="date" name="fromDate" class="form-control"
+                           value="@Model.FromDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small">To Date</label>
+                    <input type="date" name="toDate" class="form-control"
+                           value="@Model.ToDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small">Scheduled Start Time (from)</label>
+                    <input type="time" name="timeFrom" class="form-control"
+                           value="@Model.TimeFrom?.ToString(@"hh\:mm")" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small">Scheduled Start Time (to)</label>
+                    <input type="time" name="timeTo" class="form-control"
+                           value="@Model.TimeTo?.ToString(@"hh\:mm")" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small">Officer</label>
+                    <select name="officerId" class="form-select">
+                        <option value="">All Officers</option>
+                        @foreach (var o in Model.Officers)
+                        {
+                            if (Model.OfficerFilter == o.Id)
+                            {
+                                <option value="@o.Id" selected="selected">@o.FullName</option>
+                            }
+                            else
+                            {
+                                <option value="@o.Id">@o.FullName</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small">Building</label>
+                    <select name="buildingId" class="form-select">
+                        <option value="">All Buildings</option>
+                        @foreach (var b in Model.Buildings)
+                        {
+                            if (Model.BuildingFilter == b.Id)
+                            {
+                                <option value="@b.Id" selected="selected">@b.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@b.Id">@b.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">
+                        <i class="fas fa-search me-1"></i>Apply
+                    </button>
+                    <a href="/Report/MissedReport" class="btn btn-outline-secondary flex-fill">
+                        <i class="fas fa-times me-1"></i>Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="fs-3 fw-bold text-danger">@Model.MissedLocations.Count</div>
+                    <div class="small text-muted">Total Missed</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="fs-3 fw-bold text-warning">@Model.MissedLocations.Select(m => m.OfficerId).Distinct().Count()</div>
+                    <div class="small text-muted">Officers Involved</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="fs-3 fw-bold text-info">@Model.MissedLocations.Select(m => m.BuildingName).Distinct().Count()</div>
+                    <div class="small text-muted">Buildings Affected</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-0 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="fs-3 fw-bold text-secondary">@Model.MissedLocations.Select(m => m.ScheduledPatrolId).Distinct().Count()</div>
+                    <div class="small text-muted">Patrols Affected</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">
+                <i class="fas fa-list me-1"></i>Missed Locations
+                <span class="badge bg-danger ms-1">@Model.MissedLocations.Count</span>
+            </span>
+            <div class="d-flex gap-2 no-print">
+                @if (Model.MissedLocations.Any())
+                {
+                    <a href="/Report/MissedReport?@qs.TrimStart('?')&export=true" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-file-csv me-1"></i>Export CSV
+                    </a>
+                }
+                <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-print me-1"></i>Print
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            @if (!Model.MissedLocations.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <p class="mb-0">No missed locations found for the selected filters.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Date</th>
+                                <th>Scheduled Time</th>
+                                <th>Officer</th>
+                                <th>Route</th>
+                                <th>Building</th>
+                                <th>Floor</th>
+                                <th>Missed Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.MissedLocations.OrderByDescending(m => m.ScheduledDate).ThenBy(m => m.OfficerName))
+                            {
+                                <tr>
+                                    <td>@item.ScheduledDate.ToString("MM/dd/yyyy")</td>
+                                    <td class="text-nowrap">
+                                        @DateTime.Today.Add(item.ScheduledStartTime).ToString("h:mm tt")
+                                        &ndash;
+                                        @DateTime.Today.Add(item.ScheduledEndTime).ToString("h:mm tt")
+                                    </td>
+                                    <td>@item.OfficerName</td>
+                                    <td>@item.RouteName</td>
+                                    <td>@item.BuildingName</td>
+                                    <td>@item.FloorName</td>
+                                    <td><span class="badge bg-danger">@item.LocationName</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+</div>

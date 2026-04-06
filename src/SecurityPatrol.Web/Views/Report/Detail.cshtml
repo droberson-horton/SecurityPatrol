@@ -1,0 +1,151 @@
+@model SecurityPatrol.Web.ViewModels.PatrolDetailViewModel
+@using SecurityPatrol.Web.Models
+@{
+    ViewData["Title"] = $"Patrol #{Model.PatrolId} Detail";
+}
+
+<div class="page-header no-print">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-shoe-prints me-2"></i>Patrol #@Model.PatrolId</h2>
+            <small class="opacity-75">@Model.OfficerName &mdash; @Model.StartTime.ToLocalTime().ToString("MM/dd/yyyy HH:mm")</small>
+        </div>
+        <div class="d-flex gap-2">
+            @await Html.PartialAsync("_DashboardButton")
+            <a href="javascript:history.back()" class="btn btn-light">
+                <i class="fas fa-arrow-left me-1"></i>Back
+            </a>
+            <button onclick="window.print()" class="btn btn-light">
+                <i class="fas fa-print me-1"></i>Print
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row g-4">
+        <!-- Summary card -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header" style="background:#003087; color:white;">
+                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Summary</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="mb-0">
+                        <dt class="small text-muted">Officer</dt>
+                        <dd class="fw-semibold">@Model.OfficerName</dd>
+
+                        <dt class="small text-muted">Route</dt>
+                        <dd>@(Model.RouteName ?? "Ad-hoc")</dd>
+
+                        <dt class="small text-muted">Status</dt>
+                        <dd>
+                            <span class="badge @(Model.Status == PatrolStatus.Completed ? "bg-success" : Model.Status == PatrolStatus.InProgress ? "bg-warning text-dark" : "bg-danger")">
+                                @Model.Status
+                            </span>
+                        </dd>
+
+                        <dt class="small text-muted">Start</dt>
+                        <dd class="small">@Model.StartTime.ToLocalTime().ToString("MM/dd/yyyy HH:mm")</dd>
+
+                        <dt class="small text-muted">End</dt>
+                        <dd class="small">@(Model.EndTime?.ToLocalTime().ToString("MM/dd/yyyy HH:mm") ?? "—")</dd>
+
+                        <dt class="small text-muted">Duration</dt>
+                        <dd class="small">
+                            @if (Model.Duration.HasValue)
+                            {
+                                @($"{(int)Model.Duration.Value.TotalMinutes} min")
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </dd>
+
+                        <dt class="small text-muted">Locations Scanned</dt>
+                        <dd class="small">
+                            @Model.Scans.Count
+                            @if (Model.TotalRouteLocations > 0)
+                            {
+                                <span class="text-muted">/ @Model.TotalRouteLocations</span>
+                            }
+                        </dd>
+
+                        @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                        {
+                            <dt class="small text-muted">Notes</dt>
+                            <dd class="small">@Model.Notes</dd>
+                        }
+                    </dl>
+                </div>
+            </div>
+
+            @if (Model.MissedLocationNames.Any())
+            {
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Missed Locations (@Model.MissedLocationNames.Count)</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush">
+                            @foreach (var name in Model.MissedLocationNames)
+                            {
+                                <li class="list-group-item small text-danger">
+                                    <i class="fas fa-times-circle me-2"></i>@name
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Scans table -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header" style="background:#003087; color:white;">
+                    <h6 class="mb-0"><i class="fas fa-qrcode me-2"></i>Scan Log (@Model.Scans.Count)</h6>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.Scans.Any())
+                    {
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Location</th>
+                                    <th>Floor</th>
+                                    <th>Building</th>
+                                    <th>Scanned At</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int seq = 1; }
+                                @foreach (var scan in Model.Scans)
+                                {
+                                    <tr>
+                                        <td class="text-muted small">@(seq++)</td>
+                                        <td class="fw-semibold small">@scan.LocationName</td>
+                                        <td class="small">@(scan.FloorName ?? "—")</td>
+                                        <td class="small">@scan.BuildingName</td>
+                                        <td class="small">@scan.ScannedAt.ToLocalTime().ToString("HH:mm:ss")</td>
+                                        <td class="small text-muted">@(scan.Notes ?? "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-qrcode fa-2x mb-2 opacity-25"></i>
+                            <p class="small">No locations were scanned during this patrol.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
