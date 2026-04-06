@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<AdminMessage> AdminMessages { get; set; }
     public DbSet<ScheduleTemplate> ScheduleTemplates { get; set; }
     public DbSet<ScheduleTemplateSlot> ScheduleTemplateSlots { get; set; }
+    public DbSet<FloorPlan> FloorPlans { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // FloorPlan
+        modelBuilder.Entity<FloorPlan>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.OriginalFileName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.StoredFileName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.FileType).HasMaxLength(10);
+            entity.Property(e => e.Label).HasMaxLength(200);
+            entity.HasOne(e => e.Floor)
+                .WithMany()
+                .HasForeignKey(e => e.FloorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // Location
         modelBuilder.Entity<Location>(entity =>
         {
@@ -58,6 +73,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(e => e.Floor)
                 .WithMany(f => f.Locations)
                 .HasForeignKey(e => e.FloorId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.FloorPlan)
+                .WithMany(fp => fp.Locations)
+                .HasForeignKey(e => e.FloorPlanId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

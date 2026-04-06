@@ -25,6 +25,12 @@ public class Location
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Floor plan pin coordinates (0.0–1.0 as fraction of image dimensions)
+    public int? FloorPlanId { get; set; }
+    public double? MapX { get; set; }
+    public double? MapY { get; set; }
+
     public Building Building { get; set; } = null!;
     public Floor? Floor { get; set; }
+    public FloorPlan? FloorPlan { get; set; }
 }

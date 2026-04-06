@@ -22,6 +22,49 @@ namespace SecurityPatrol.Web.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("SecurityPatrol.Web.Models.FloorPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("FloorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FloorId");
+
+                    b.ToTable("FloorPlans");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
@@ -30,10 +73,6 @@ namespace SecurityPatrol.Web.Migrations
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
-
-b.Property<string>("TimeZoneId")
- .HasMaxLength(100)
- .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
@@ -347,10 +386,6 @@ b.Property<string>("TimeZoneId")
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-b.Property<string>("TimeZoneId")
- .HasMaxLength(100)
- .HasColumnType("nvarchar(100)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -394,12 +429,17 @@ b.Property<string>("TimeZoneId")
                     b.Property<int?>("FloorId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("FloorPlanId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-b.Property<string>("TimeZoneId")
- .HasMaxLength(100)
- .HasColumnType("nvarchar(100)");
+                    b.Property<double?>("MapX")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("MapY")
+                        .HasColumnType("float");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -416,6 +456,8 @@ b.Property<string>("TimeZoneId")
                     b.HasIndex("BuildingId");
 
                     b.HasIndex("FloorId");
+
+                    b.HasIndex("FloorPlanId");
 
                     b.HasIndex("QrCode")
                         .IsUnique();
@@ -829,6 +871,17 @@ b.Property<string>("TimeZoneId")
                     b.Navigation("Building");
                 });
 
+            modelBuilder.Entity("SecurityPatrol.Web.Models.FloorPlan", b =>
+                {
+                    b.HasOne("SecurityPatrol.Web.Models.Floor", "Floor")
+                        .WithMany()
+                        .HasForeignKey("FloorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Floor");
+                });
+
             modelBuilder.Entity("SecurityPatrol.Web.Models.Location", b =>
                 {
                     b.HasOne("SecurityPatrol.Web.Models.Building", "Building")
@@ -842,9 +895,16 @@ b.Property<string>("TimeZoneId")
                         .HasForeignKey("FloorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("SecurityPatrol.Web.Models.FloorPlan", "FloorPlan")
+                        .WithMany("Locations")
+                        .HasForeignKey("FloorPlanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Building");
 
                     b.Navigation("Floor");
+
+                    b.Navigation("FloorPlan");
                 });
 
             modelBuilder.Entity("SecurityPatrol.Web.Models.Patrol", b =>
@@ -955,6 +1015,11 @@ b.Property<string>("TimeZoneId")
                 {
                     b.Navigation("Floors");
 
+                    b.Navigation("Locations");
+                });
+
+            modelBuilder.Entity("SecurityPatrol.Web.Models.FloorPlan", b =>
+                {
                     b.Navigation("Locations");
                 });
 

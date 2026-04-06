@@ -1,0 +1,192 @@
+@model SecurityPatrol.Web.ViewModels.FloorPlanViewerViewModel
+@{
+    ViewData["Title"] = Model.FloorPlan.Label ?? Model.FloorPlan.OriginalFileName;
+    var isPdf = Model.FloorPlan.FileType == "pdf";
+    var pinnedLocations = Model.Locations.Where(l => l.MapX.HasValue && l.MapY.HasValue).ToList();
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h2 class="mb-0">
+                <i class="fas fa-map me-2"></i>@(Model.FloorPlan.Label ?? Model.FloorPlan.OriginalFileName)
+            </h2>
+            <small class="opacity-75">@Model.FloorPlan.Floor.Name &mdash; @Model.FloorPlan.Floor.Building.Name</small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            @if (User.IsInRole("Administrator"))
+            {
+                <a href="/Admin/FloorPlanEditor/@Model.FloorPlan.Id" class="btn btn-light">
+                    <i class="fas fa-edit me-1"></i>Edit Map
+                </a>
+            }
+            <a href="/FloorPlan" class="btn btn-light">
+                <i class="fas fa-arrow-left me-1"></i>Back
+            </a>
+            @await Html.PartialAsync("_DashboardButton")
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-3 px-md-4">
+
+    <!-- Map Container -->
+    <div class="mb-4">
+        <div id="mapWrapper" style="position:relative; width:100%; max-width:1200px; margin:0 auto;">
+            @if (isPdf)
+            {
+                <canvas id="pdfCanvas" style="width:100%; display:block; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15);"></canvas>
+            }
+            else
+            {
+                <img id="floorPlanImg" src="/uploads/floorplans/@Model.FloorPlan.StoredFileName"
+                     style="width:100%; display:block; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15);"
+                     alt="Floor Plan" />
+            }
+            <svg id="mapOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></svg>
+        </div>
+    </div>
+
+    <!-- Location Legend -->
+    @if (pinnedLocations.Any())
+    {
+        <div class="card border-0 shadow-sm mb-4" style="max-width:1200px; margin:0 auto;">
+            <div class="card-header fw-semibold" style="background:#003087; color:white;">
+                <i class="fas fa-list me-2"></i>Checkpoint Legend
+            </div>
+            <div class="card-body p-0">
+                <div class="row g-0">
+                    @{
+                        int idx = 1;
+                    }
+                    @foreach (var loc in pinnedLocations)
+                    {
+                        <div class="col-md-6 col-lg-4">
+                            <div class="d-flex align-items-start p-3 border-bottom border-end">
+                                <span class="badge rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 me-3"
+                                      style="background:#003087; color:white; width:28px; height:28px; font-size:12px; font-weight:bold;">
+                                    @idx
+                                </span>
+                                <div class="min-w-0">
+                                    <div class="fw-semibold small">@loc.Name</div>
+                                    @if (!string.IsNullOrWhiteSpace(loc.Description))
+                                    {
+                                        <div class="text-muted" style="font-size:0.78rem;">@loc.Description</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        idx++;
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm mb-4" style="max-width:1200px; margin:0 auto;">
+            <div class="card-body text-center py-4 text-muted">
+                <i class="fas fa-map-pin fa-2x mb-2 opacity-25"></i>
+                <p class="mb-0 small">No checkpoints have been mapped to this floor plan yet.</p>
+            </div>
+        </div>
+    }
+
+</div>
+
+@if (isPdf)
+{
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+}
+
+@section Scripts {
+    <script>
+        var pins = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Locations
+                .Where(l => l.MapX.HasValue && l.MapY.HasValue)
+                .Select(l => new {
+                    id          = l.Id,
+                    name        = l.Name,
+                    description = l.Description ?? "",
+                    qrCode      = l.QrCode,
+                    x           = l.MapX,
+                    y           = l.MapY
+                })
+        ));
+
+        var fileType = '@Html.Raw(Model.FloorPlan.FileType)';
+
+        function renderPins() {
+            var svg     = document.getElementById('mapOverlay');
+            var wrapper = document.getElementById('mapWrapper');
+            if (!svg || !wrapper) return;
+
+            svg.setAttribute('viewBox', '0 0 ' + wrapper.offsetWidth + ' ' + wrapper.offsetHeight);
+            svg.innerHTML = '';
+
+            pins.forEach(function(pin, i) {
+                var cx = pin.x * wrapper.offsetWidth;
+                var cy = pin.y * wrapper.offsetHeight;
+
+                var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('style', 'cursor:pointer; pointer-events:all;');
+                g.setAttribute('class', 'map-pin-view');
+
+                var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', 16);
+                circle.setAttribute('fill', '#003087');
+                circle.setAttribute('stroke', 'white');
+                circle.setAttribute('stroke-width', '2');
+
+                var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', cx);
+                text.setAttribute('y', cy + 5);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', 'white');
+                text.setAttribute('font-size', '12');
+                text.setAttribute('font-weight', 'bold');
+                text.textContent = (i + 1).toString();
+
+                var title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = pin.name + (pin.description ? '\n' + pin.description : '');
+
+                g.appendChild(circle);
+                g.appendChild(text);
+                g.appendChild(title);
+                svg.appendChild(g);
+            });
+        }
+
+        if (fileType === 'pdf') {
+            var pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            pdfjsLib.getDocument('/uploads/floorplans/@Model.FloorPlan.StoredFileName').promise.then(function(pdf) {
+                pdf.getPage(1).then(function(page) {
+                    var scale    = 2;
+                    var viewport = page.getViewport({ scale: scale });
+                    var canvas   = document.getElementById('pdfCanvas');
+                    canvas.height = viewport.height;
+                    canvas.width  = viewport.width;
+                    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(renderPins);
+                });
+            });
+        } else {
+            var img = document.getElementById('floorPlanImg');
+            if (img) {
+                if (img.complete) {
+                    renderPins();
+                } else {
+                    img.addEventListener('load', renderPins);
+                }
+            }
+        }
+
+        var resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(renderPins, 100);
+        });
+    </script>
+}

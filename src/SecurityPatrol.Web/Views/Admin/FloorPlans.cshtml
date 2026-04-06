@@ -1,0 +1,220 @@
+@model SecurityPatrol.Web.ViewModels.FloorPlanListViewModel
+@{
+    ViewData["Title"] = "Floor Plans";
+
+    // Flatten all building/floor groups for the upload dropdowns
+    var allBuildingGroups = Model.Buildings;
+    var allFloorGroups = allBuildingGroups.SelectMany(bg => bg.Floors).ToList();
+}
+
+<div class="page-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-map me-2"></i>Floor Plans</h2>
+            <small class="opacity-75">Upload and manage building floor plan maps</small>
+        </div>
+        <div>
+            @await Html.PartialAsync("_DashboardButton")
+        </div>
+    </div>
+</div>
+
+<form id="csrfForm">@Html.AntiForgeryToken()</form>
+
+<div class="container">
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3">
+            <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* ── Upload Card ── *@
+    <div class="card mb-4 mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center"
+             style="background:#003087; color:white;">
+            <span><i class="fas fa-upload me-2"></i>Upload New Floor Plan</span>
+            <button class="btn btn-sm btn-outline-light" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#uploadCollapse"
+                    aria-expanded="false" aria-controls="uploadCollapse">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+        <div class="collapse" id="uploadCollapse">
+            <div class="card-body">
+                <form method="post" asp-action="UploadFloorPlan" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Building <span class="text-danger">*</span></label>
+                            <select id="uploadBuilding" class="form-select">
+                                <option value="">-- Select Building --</option>
+                                @foreach (var buildingGroup in allBuildingGroups)
+                                {
+                                    <option value="@buildingGroup.Building.Id">@buildingGroup.Building.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Floor <span class="text-danger">*</span></label>
+                            <select id="uploadFloor" name="floorId" class="form-select" required>
+                                <option value="">-- Select Floor --</option>
+                                @foreach (var floorGroup in allFloorGroups)
+                                {
+                                    <option value="@floorGroup.Floor.Id"
+                                            data-building="@floorGroup.Floor.BuildingId">
+                                        @floorGroup.Floor.Name
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Floor Plan File <span class="text-danger">*</span></label>
+                            <input type="file" name="file" class="form-control" required
+                                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Display Label <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" name="label" class="form-control" maxlength="200"
+                                   placeholder="e.g. Ground Floor North Wing" />
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-upload me-1"></i>Upload Floor Plan
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Accepted: JPG, PNG, GIF, WebP, PDF. Max 20 MB.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @* ── Floor Plans List ── *@
+    @if (Model.Buildings.Any())
+    {
+        @foreach (var buildingGroup in Model.Buildings)
+        {
+            <h4 class="mt-4 mb-3 fw-semibold">
+                <i class="fas fa-building me-2 text-primary"></i>@buildingGroup.Building.Name
+            </h4>
+
+            @if (!buildingGroup.Floors.Any())
+            {
+                <p class="text-muted fst-italic ms-3">No floors configured for this building.</p>
+            }
+            else
+            {
+                @foreach (var floorGroup in buildingGroup.Floors)
+                {
+                    <h6 class="ms-3 mt-3 mb-2 text-secondary fw-semibold">
+                        <i class="fas fa-layer-group me-1"></i>@floorGroup.Floor.Name
+                    </h6>
+
+                    @if (!floorGroup.Plans.Any())
+                    {
+                        <p class="text-muted fst-italic small ms-4">
+                            <i class="fas fa-info-circle me-1 opacity-50"></i>No floor plans yet.
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="ms-3 mb-3">
+                            @foreach (var plan in floorGroup.Plans)
+                            {
+                                <div class="card mb-2 shadow-sm">
+                                    <div class="card-body py-2 px-3">
+                                        <div class="d-flex align-items-center gap-3 flex-wrap">
+
+                                            @* Thumbnail / PDF icon *@
+                                            <div class="flex-shrink-0">
+                                                @if (plan.FileType == "pdf")
+                                                {
+                                                    <i class="fas fa-file-pdf fa-2x text-danger" title="PDF document"></i>
+                                                }
+                                                else
+                                                {
+                                                    <img src="/uploads/floorplans/@plan.StoredFileName"
+                                                         alt="@(plan.Label ?? plan.OriginalFileName)"
+                                                         style="height:60px; object-fit:cover; border-radius:4px; border:1px solid #dee2e6;" />
+                                                }
+                                            </div>
+
+                                            @* Details *@
+                                            <div class="flex-grow-1 min-width-0">
+                                                <div class="fw-semibold text-truncate">
+                                                    @(plan.Label ?? plan.OriginalFileName)
+                                                </div>
+                                                <div class="text-muted small">
+                                                    @floorGroup.Floor.Name &mdash; @buildingGroup.Building.Name
+                                                </div>
+                                                <div class="text-muted small">
+                                                    <i class="fas fa-map-pin me-1"></i>
+                                                    @plan.Locations.Count(l => l.MapX.HasValue) pin(s)
+                                                </div>
+                                            </div>
+
+                                            @* Action buttons *@
+                                            <div class="d-flex gap-2 flex-wrap align-items-center">
+                                                <a href="/FloorPlan/View/@plan.Id"
+                                                   class="btn btn-sm btn-outline-secondary">
+                                                    <i class="fas fa-eye me-1"></i>Preview
+                                                </a>
+                                                <a href="/Admin/FloorPlanEditor/@plan.Id"
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-map-marked-alt me-1"></i>Edit Map
+                                                </a>
+                                                <form method="post" asp-action="DeleteFloorPlan" class="d-inline"
+                                                      onsubmit="return confirm('Delete this floor plan? This will also remove all map pins assigned to it.')">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@plan.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-trash me-1"></i>Delete
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-map fa-4x mb-3 opacity-25"></i>
+            <p class="mb-0">No floor plans uploaded yet.</p>
+            <p class="small">Use the upload panel above to add your first floor plan.</p>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('uploadBuilding').addEventListener('change', function () {
+            var bid = parseInt(this.value);
+            document.querySelectorAll('#uploadFloor option[data-building]').forEach(function (opt) {
+                opt.style.display = (!bid || parseInt(opt.dataset.building) === bid) ? '' : 'none';
+            });
+            // Reset to first visible option
+            var first = document.querySelector('#uploadFloor option[data-building]:not([style*="none"])');
+            document.getElementById('uploadFloor').value = first ? first.value : '';
+        });
+    </script>
+}

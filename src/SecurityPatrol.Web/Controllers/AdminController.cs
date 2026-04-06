@@ -735,4 +735,247 @@ public class AdminController : Controller
             : $"Created {manualCreated} schedule(s) across {manualDays} day(s).";
         return RedirectToAction(nameof(Schedules));
     }
+
+    // ---- Floor Plans ----
+
+    [HttpGet]
+    public async Task<IActionResult> FloorPlans()
+    {
+        var buildings = await _db.Buildings
+            .Include(b => b.Floors)
+            .Where(b => b.IsActive)
+            .OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
+            .ToListAsync();
+
+        var plans = await _db.FloorPlans
+            .Include(fp => fp.Floor)
+            .Where(fp => fp.IsActive)
+            .OrderBy(fp => fp.Floor.FloorNumber)
+            .ToListAsync();
+
+        var vm = new FloorPlanListViewModel
+        {
+            Buildings = buildings.Select(b => new FloorPlanBuildingGroup
+            {
+                Building = b,
+                Floors = b.Floors
+                    .Where(f => f.IsActive)
+                    .OrderBy(f => f.FloorNumber)
+                    .Select(f => new FloorPlanFloorGroup
+                    {
+                        Floor = f,
+                        Plans = plans.Where(p => p.FloorId == f.Id).ToList()
+                    })
+                    .ToList()
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadFloorPlan(int floorId, IFormFile? file, string? label)
+    {
+        var allowed = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf" };
+        const long maxBytes = 20L * 1024 * 1024;
+
+        if (file == null || file.Length == 0)
+        {
+            TempData["Error"] = "Please select a file to upload.";
+            return RedirectToAction(nameof(FloorPlans));
+        }
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowed.Contains(ext))
+        {
+            TempData["Error"] = "Invalid file type. Allowed types: jpg, jpeg, png, gif, webp, pdf.";
+            return RedirectToAction(nameof(FloorPlans));
+        }
+
+        if (file.Length > maxBytes)
+        {
+            TempData["Error"] = "File exceeds the 20 MB size limit.";
+            return RedirectToAction(nameof(FloorPlans));
+        }
+
+        var storedFileName = $"{Guid.NewGuid()}{ext}";
+        var uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "floorplans");
+        Directory.CreateDirectory(uploadDir);
+        var filePath = Path.Combine(uploadDir, storedFileName);
+
+        await using (var stream = System.IO.File.Create(filePath))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var fileType = ext == ".pdf" ? "pdf" : "image";
+
+        var plan = new FloorPlan
+        {
+            FloorId          = floorId,
+            Label            = label,
+            OriginalFileName = file.FileName,
+            StoredFileName   = storedFileName,
+            FileType         = fileType,
+            IsActive         = true,
+            UploadedAt       = DateTime.UtcNow
+        };
+
+        _db.FloorPlans.Add(plan);
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Floor plan uploaded.";
+        return RedirectToAction(nameof(FloorPlans));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> FloorPlanEditor(int id)
+    {
+        var plan = await _db.FloorPlans
+            .Include(fp => fp.Floor)
+                .ThenInclude(f => f.Building)
+            .FirstOrDefaultAsync(fp => fp.Id == id && fp.IsActive);
+
+        if (plan == null)
+            return NotFound();
+
+        var mappedLocations = await _db.Locations
+            .Where(l => l.FloorPlanId == id && l.IsActive)
+            .ToListAsync();
+
+        var unmappedLocations = await _db.Locations
+            .Where(l => l.FloorId == plan.FloorId && l.IsActive && l.FloorPlanId == null)
+            .ToListAsync();
+
+        var vm = new FloorPlanEditorViewModel
+        {
+            FloorPlan          = plan,
+            MappedLocations    = mappedLocations,
+            UnmappedLocations  = unmappedLocations
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteFloorPlan(int id)
+    {
+        var plan = await _db.FloorPlans.FindAsync(id);
+        if (plan != null)
+        {
+            plan.IsActive = false;
+
+            var pinnedLocations = await _db.Locations
+                .Where(l => l.FloorPlanId == id)
+                .ToListAsync();
+
+            foreach (var loc in pinnedLocations)
+            {
+                loc.FloorPlanId = null;
+                loc.MapX        = null;
+                loc.MapY        = null;
+            }
+
+            await _db.SaveChangesAsync();
+        }
+
+        return RedirectToAction(nameof(FloorPlans));
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> AddMapPin([FromBody] AddMapPinRequest request)
+    {
+        Location loc;
+
+        if (request.ExistingLocationId.HasValue)
+        {
+            loc = await _db.Locations.FindAsync(request.ExistingLocationId.Value)
+                  ?? throw new InvalidOperationException("Location not found.");
+
+            loc.FloorPlanId = request.FloorPlanId;
+            loc.MapX        = request.X;
+            loc.MapY        = request.Y;
+        }
+        else
+        {
+            var plan = await _db.FloorPlans
+                .Include(fp => fp.Floor)
+                .FirstOrDefaultAsync(fp => fp.Id == request.FloorPlanId)
+                ?? throw new InvalidOperationException("Floor plan not found.");
+
+            loc = new Location
+            {
+                Name        = request.Name,
+                Description = request.Description,
+                BuildingId  = plan.Floor.BuildingId,
+                FloorId     = plan.FloorId,
+                FloorPlanId = request.FloorPlanId,
+                MapX        = request.X,
+                MapY        = request.Y,
+                QrCode      = Guid.NewGuid().ToString(),
+                IsActive    = true,
+                CreatedAt   = DateTime.UtcNow
+            };
+
+            _db.Locations.Add(loc);
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Json(new
+        {
+            success     = true,
+            locationId  = loc.Id,
+            name        = loc.Name,
+            description = loc.Description,
+            qrCode      = loc.QrCode,
+            x           = loc.MapX,
+            y           = loc.MapY
+        });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> MoveMapPin([FromBody] MovePinRequest request)
+    {
+        var loc = await _db.Locations.FindAsync(request.LocationId)
+                  ?? throw new InvalidOperationException("Location not found.");
+
+        loc.MapX = request.X;
+        loc.MapY = request.Y;
+
+        await _db.SaveChangesAsync();
+
+        return Json(new { success = true });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> UpdateMapPin([FromBody] UpdatePinRequest request)
+    {
+        var loc = await _db.Locations.FindAsync(request.LocationId)
+                  ?? throw new InvalidOperationException("Location not found.");
+
+        loc.Name        = request.Name;
+        loc.Description = request.Description;
+
+        await _db.SaveChangesAsync();
+
+        return Json(new { success = true, name = loc.Name, description = loc.Description });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> RemoveMapPin([FromBody] RemovePinRequest request)
+    {
+        var loc = await _db.Locations.FindAsync(request.LocationId)
+                  ?? throw new InvalidOperationException("Location not found.");
+
+        loc.FloorPlanId = null;
+        loc.MapX        = null;
+        loc.MapY        = null;
+
+        await _db.SaveChangesAsync();
+
+        return Json(new { success = true });
+    }
 }

@@ -16,6 +16,9 @@
         </div>
         <div class="d-flex gap-2">
             @await Html.PartialAsync("_DashboardButton")
+            <a href="/Admin/FloorPlans" class="btn btn-light">
+                <i class="fas fa-map me-1"></i>Floor Plans
+            </a>
             <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addBuildingModal">
                 <i class="fas fa-plus me-1"></i>Add Building
             </button>

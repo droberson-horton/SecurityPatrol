@@ -1,0 +1,488 @@
+@model SecurityPatrol.Web.ViewModels.FloorPlanEditorViewModel
+@{
+    ViewData["Title"] = "Map Editor";
+}
+
+@section Styles {
+<style>
+    .map-pin { transition: opacity 0.1s; }
+    .map-pin:hover circle { opacity: 0.85; }
+    .unmapped-item:hover { background: #e9ecef !important; }
+    body { overflow: hidden; }
+</style>
+}
+
+<div class="page-header">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i>Map Editor</h2>
+            <small class="opacity-75">@(Model.FloorPlan.Label ?? Model.FloorPlan.OriginalFileName) &mdash; @Model.FloorPlan.Floor.Name, @Model.FloorPlan.Floor.Building.Name</small>
+        </div>
+        <div class="d-flex gap-2">
+            @await Html.PartialAsync("_DashboardButton")
+            <a href="/Admin/FloorPlans" class="btn btn-light"><i class="fas fa-arrow-left me-1"></i>Floor Plans</a>
+            <a href="/FloorPlan/View/@Model.FloorPlan.Id" class="btn btn-light" target="_blank"><i class="fas fa-eye me-1"></i>Preview</a>
+        </div>
+    </div>
+</div>
+
+<form id="csrfForm" style="display:none;">@Html.AntiForgeryToken()</form>
+
+<div class="d-flex" style="height:calc(100vh - 120px); overflow:hidden;">
+
+    <!-- ── Sidebar ── -->
+    <div id="editorSidebar" style="width:280px; min-width:280px; background:#f8f9fa; border-right:1px solid #dee2e6; overflow-y:auto; display:flex; flex-direction:column;">
+
+        <!-- Mode toggle -->
+        <div class="p-3 border-bottom">
+            <label class="form-label small fw-semibold text-muted">EDIT MODE</label>
+            <div class="btn-group w-100">
+                <button id="btnModeAdd" class="btn btn-outline-primary active" onclick="setMode('add')">
+                    <i class="fas fa-plus me-1"></i>Add Pin
+                </button>
+                <button id="btnModeSelect" class="btn btn-outline-secondary" onclick="setMode('select')">
+                    <i class="fas fa-mouse-pointer me-1"></i>Select
+                </button>
+            </div>
+        </div>
+
+        <!-- Unmapped locations -->
+        <div class="p-3 border-bottom">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label small fw-semibold text-muted mb-0">UNMAPPED LOCATIONS</label>
+                <span class="badge bg-secondary" id="unmappedCount">@Model.UnmappedLocations.Count</span>
+            </div>
+            <p class="small text-muted mb-2">Click a location then click the map to place it, or switch to Add mode to create new pins.</p>
+            <div id="unmappedList">
+                @foreach (var loc in Model.UnmappedLocations)
+                {
+                    <div class="unmapped-item p-2 mb-1 rounded border bg-white small"
+                         data-id="@loc.Id" data-name="@loc.Name" data-desc="@(loc.Description ?? "")"
+                         style="cursor:pointer;" onclick="selectUnmapped(this)">
+                        <i class="fas fa-map-marker text-muted me-1"></i>@loc.Name
+                        @if (!string.IsNullOrEmpty(loc.Description))
+                        {
+                            <div class="text-muted" style="font-size:10px;">@loc.Description</div>
+                        }
+                    </div>
+                }
+                @if (!Model.UnmappedLocations.Any())
+                {
+                    <div class="text-muted small fst-italic">All floor locations are mapped.</div>
+                }
+            </div>
+        </div>
+
+        <!-- Selected pin edit panel -->
+        <div id="selectedPanel" class="p-3 d-none">
+            <label class="form-label small fw-semibold text-muted">SELECTED PIN</label>
+            <div class="mb-2">
+                <label class="form-label small">Name <span class="text-danger">*</span></label>
+                <input type="text" id="editName" class="form-control form-control-sm" maxlength="200" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label small">Description</label>
+                <textarea id="editDesc" class="form-control form-control-sm" rows="2" maxlength="500"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-primary flex-fill" onclick="saveSelectedPin()"><i class="fas fa-save me-1"></i>Save</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="removeSelectedPin()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="mt-2 small text-muted" id="selectedQr"></div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="p-3 mt-auto border-top">
+            <div id="statusMsg" class="small text-muted">Click on the map to add a pin.</div>
+        </div>
+
+    </div>
+
+    <!-- ── Map area ── -->
+    <div style="flex:1; overflow:auto; background:#e9ecef; display:flex; align-items:flex-start; justify-content:center; padding:16px;">
+        <div id="mapWrapper" style="position:relative; display:inline-block; max-width:100%;">
+            @if (Model.FloorPlan.FileType == "pdf")
+            {
+                <canvas id="pdfCanvas" style="display:block; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.2);"></canvas>
+            }
+            else
+            {
+                <img id="floorPlanImg" src="/uploads/floorplans/@Model.FloorPlan.StoredFileName"
+                     style="display:block; max-width:100%; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.2);"
+                     alt="Floor Plan" />
+            }
+            <svg id="mapOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%;"></svg>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Add Pin Modal ── -->
+<div class="modal fade" id="addPinModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-map-marker-alt me-2"></i>New Location Pin</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Location Name <span class="text-danger">*</span></label>
+                    <input type="text" id="newPinName" class="form-control" maxlength="200" />
+                    <div class="invalid-feedback">Name is required.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Description</label>
+                    <textarea id="newPinDesc" class="form-control" rows="2" maxlength="500"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmAddPin" class="btn btn-primary">
+                    <i class="fas fa-map-marker-alt me-1"></i>Place Pin
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @if (Model.FloorPlan.FileType == "pdf")
+    {
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    }
+    <script>
+        // ---- State ----
+        var mode = 'add';
+        var selectedPinId = null;
+        var pendingX = 0, pendingY = 0;
+        var pendingUnmappedId = null;
+        var isDragging = false;
+        var dragPinId = null;
+        var dragStartX = 0, dragStartY = 0;
+        var dragMoved = false;
+
+        // ---- Pin data from server ----
+        var pins = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.MappedLocations.Select(l => new {
+                id = l.Id,
+                name = l.Name,
+                description = l.Description ?? "",
+                qrCode = l.QrCode,
+                x = l.MapX,
+                y = l.MapY
+            })
+        ));
+
+        function getCsrf() {
+            var el = document.querySelector('input[name="__RequestVerificationToken"]');
+            return el ? el.value : '';
+        }
+
+        // ---- SVG rendering ----
+        var svg = document.getElementById('mapOverlay');
+        var wrapper = document.getElementById('mapWrapper');
+
+        function renderPins() {
+            svg.innerHTML = '';
+            var w = wrapper.offsetWidth;
+            var h = wrapper.offsetHeight;
+            svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+
+            pins.forEach(function (pin, i) {
+                var cx = pin.x * w;
+                var cy = pin.y * h;
+
+                var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.dataset.id = pin.id;
+                g.setAttribute('class', 'map-pin');
+                g.style.cursor = 'grab';
+
+                var isSelected = pin.id === selectedPinId;
+
+                var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', 18);
+                circle.setAttribute('fill', isSelected ? '#ffc107' : '#003087');
+                circle.setAttribute('stroke', isSelected ? '#856404' : 'white');
+                circle.setAttribute('stroke-width', isSelected ? '3' : '2');
+
+                var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', cx);
+                text.setAttribute('y', cy + 5);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', isSelected ? '#212529' : 'white');
+                text.setAttribute('font-size', '12');
+                text.setAttribute('font-weight', 'bold');
+                text.setAttribute('pointer-events', 'none');
+                text.textContent = (i + 1).toString();
+
+                var title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                title.textContent = pin.name + (pin.description ? '\n' + pin.description : '');
+
+                g.appendChild(circle);
+                g.appendChild(text);
+                g.appendChild(title);
+
+                g.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (!isDragging) selectPin(pin.id);
+                });
+
+                g.addEventListener('mousedown', function (e) {
+                    e.stopPropagation();
+                    dragPinId = pin.id;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                });
+
+                svg.appendChild(g);
+            });
+        }
+
+        // ---- Drag to move pins ----
+        document.addEventListener('mousemove', function (e) {
+            if (dragPinId === null) return;
+            var dx = Math.abs(e.clientX - dragStartX);
+            var dy = Math.abs(e.clientY - dragStartY);
+            if (dx > 4 || dy > 4) {
+                isDragging = true;
+                dragMoved = true;
+                var rect = wrapper.getBoundingClientRect();
+                var x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                var y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+                var pin = pins.find(function (p) { return p.id === dragPinId; });
+                if (pin) { pin.x = x; pin.y = y; }
+                renderPins();
+            }
+        });
+
+        document.addEventListener('mouseup', function (e) {
+            if (dragPinId !== null && dragMoved) {
+                var pin = pins.find(function (p) { return p.id === dragPinId; });
+                if (pin) saveMove(pin.id, pin.x, pin.y);
+            }
+            dragPinId = null;
+            dragMoved = false;
+            setTimeout(function () { isDragging = false; }, 50);
+        });
+
+        // ---- Click on SVG background ----
+        svg.addEventListener('click', function (e) {
+            if (isDragging) return;
+            var rect = wrapper.getBoundingClientRect();
+            var x = (e.clientX - rect.left) / rect.width;
+            var y = (e.clientY - rect.top) / rect.height;
+            x = Math.min(1, Math.max(0, x));
+            y = Math.min(1, Math.max(0, y));
+
+            if (pendingUnmappedId !== null) {
+                placeUnmapped(pendingUnmappedId, x, y);
+                return;
+            }
+            if (mode === 'add') {
+                pendingX = x;
+                pendingY = y;
+                document.getElementById('newPinName').value = '';
+                document.getElementById('newPinDesc').value = '';
+                document.getElementById('newPinName').classList.remove('is-invalid');
+                var modal = new bootstrap.Modal(document.getElementById('addPinModal'));
+                modal.show();
+            } else {
+                selectedPinId = null;
+                document.getElementById('selectedPanel').classList.add('d-none');
+                renderPins();
+            }
+        });
+
+        // ---- Mode ----
+        function setMode(m) {
+            mode = m;
+            pendingUnmappedId = null;
+            document.querySelectorAll('.unmapped-item').forEach(function (el) {
+                el.classList.remove('border-primary', 'bg-light');
+                el.style.borderColor = '';
+            });
+            document.getElementById('btnModeAdd').classList.toggle('active', m === 'add');
+            document.getElementById('btnModeSelect').classList.toggle('active', m === 'select');
+            document.getElementById('statusMsg').textContent = m === 'add'
+                ? 'Click on map to add a new pin.'
+                : 'Click a pin to select and edit it.';
+        }
+
+        // ---- Select unmapped location ----
+        function selectUnmapped(el) {
+            document.querySelectorAll('.unmapped-item').forEach(function (e) {
+                e.classList.remove('border-primary', 'bg-light');
+                e.style.borderColor = '';
+            });
+            var id = parseInt(el.dataset.id);
+            if (pendingUnmappedId === id) {
+                pendingUnmappedId = null;
+                document.getElementById('statusMsg').textContent = 'Click on the map to add a pin.';
+                return;
+            }
+            pendingUnmappedId = id;
+            el.style.borderColor = '#003087';
+            el.classList.add('bg-light');
+            document.getElementById('statusMsg').textContent = 'Now click on the map to place "' + el.dataset.name + '".';
+        }
+
+        async function placeUnmapped(locId, x, y) {
+            var el = document.querySelector('.unmapped-item[data-id="' + locId + '"]');
+            var response = await fetch('/Admin/AddMapPin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ floorPlanId: @Model.FloorPlan.Id, x: x, y: y, existingLocationId: locId, name: '', description: '' })
+            });
+            var data = await response.json();
+            if (data.success) {
+                pins.push({ id: data.locationId, name: data.name, description: data.description, qrCode: data.qrCode, x: data.x, y: data.y });
+                if (el) el.remove();
+                var count = document.getElementById('unmappedCount');
+                count.textContent = parseInt(count.textContent) - 1;
+                pendingUnmappedId = null;
+                renderPins();
+                document.getElementById('statusMsg').textContent = 'Pin placed.';
+            } else {
+                document.getElementById('statusMsg').textContent = 'Error placing pin.';
+            }
+        }
+
+        // ---- Select pin for editing ----
+        function selectPin(id) {
+            selectedPinId = id;
+            var pin = pins.find(function (p) { return p.id === id; });
+            if (!pin) return;
+            document.getElementById('editName').value = pin.name;
+            document.getElementById('editDesc').value = pin.description;
+            document.getElementById('selectedQr').textContent = pin.qrCode ? 'QR: ' + pin.qrCode : '';
+            document.getElementById('selectedPanel').classList.remove('d-none');
+            setMode('select');
+            renderPins();
+        }
+
+        async function saveSelectedPin() {
+            if (!selectedPinId) return;
+            var name = document.getElementById('editName').value.trim();
+            if (!name) { alert('Name is required.'); return; }
+            var desc = document.getElementById('editDesc').value.trim();
+            var response = await fetch('/Admin/UpdateMapPin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locationId: selectedPinId, name: name, description: desc })
+            });
+            var data = await response.json();
+            if (data.success) {
+                var pin = pins.find(function (p) { return p.id === selectedPinId; });
+                if (pin) { pin.name = data.name; pin.description = data.description; }
+                renderPins();
+                document.getElementById('statusMsg').textContent = 'Pin updated.';
+            } else {
+                document.getElementById('statusMsg').textContent = 'Error saving pin.';
+            }
+        }
+
+        async function removeSelectedPin() {
+            if (!selectedPinId) return;
+            if (!confirm('Remove this pin from the map? The location will not be deleted.')) return;
+            var id = selectedPinId;
+            var pin = pins.find(function (p) { return p.id === id; });
+            var response = await fetch('/Admin/RemoveMapPin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locationId: id })
+            });
+            var data = await response.json();
+            if (data.success) {
+                pins = pins.filter(function (p) { return p.id !== id; });
+                selectedPinId = null;
+                document.getElementById('selectedPanel').classList.add('d-none');
+                if (pin) {
+                    var div = document.createElement('div');
+                    div.className = 'unmapped-item p-2 mb-1 rounded border bg-white small';
+                    div.dataset.id = pin.id;
+                    div.dataset.name = pin.name;
+                    div.dataset.desc = pin.description;
+                    div.style.cursor = 'pointer';
+                    div.onclick = function () { selectUnmapped(this); };
+                    div.innerHTML = '<i class="fas fa-map-marker text-muted me-1"></i>' + pin.name;
+                    document.getElementById('unmappedList').appendChild(div);
+                    var count = document.getElementById('unmappedCount');
+                    count.textContent = parseInt(count.textContent) + 1;
+                }
+                renderPins();
+                document.getElementById('statusMsg').textContent = 'Pin removed.';
+            } else {
+                document.getElementById('statusMsg').textContent = 'Error removing pin.';
+            }
+        }
+
+        async function saveMove(id, x, y) {
+            await fetch('/Admin/MoveMapPin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locationId: id, x: x, y: y })
+            });
+        }
+
+        // ---- Add Pin modal confirm ----
+        document.getElementById('confirmAddPin').addEventListener('click', async function () {
+            var name = document.getElementById('newPinName').value.trim();
+            if (!name) {
+                document.getElementById('newPinName').classList.add('is-invalid');
+                return;
+            }
+            document.getElementById('newPinName').classList.remove('is-invalid');
+            var desc = document.getElementById('newPinDesc').value.trim();
+            var response = await fetch('/Admin/AddMapPin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ floorPlanId: @Model.FloorPlan.Id, x: pendingX, y: pendingY, name: name, description: desc, existingLocationId: null })
+            });
+            var data = await response.json();
+            if (data.success) {
+                pins.push({ id: data.locationId, name: data.name, description: data.description, qrCode: data.qrCode, x: data.x, y: data.y });
+                bootstrap.Modal.getInstance(document.getElementById('addPinModal')).hide();
+                renderPins();
+                document.getElementById('statusMsg').textContent = 'Pin added.';
+            } else {
+                document.getElementById('statusMsg').textContent = 'Error adding pin.';
+            }
+        });
+
+        // ---- Also allow Enter key in new pin name field ----
+        document.getElementById('newPinName').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') document.getElementById('confirmAddPin').click();
+        });
+
+        // ---- Initialise ----
+        @if (Model.FloorPlan.FileType == "pdf")
+        {
+            <text>
+            var pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            pdfjsLib.getDocument('/uploads/floorplans/@Model.FloorPlan.StoredFileName').promise.then(function (pdf) {
+                pdf.getPage(1).then(function (page) {
+                    var viewport = page.getViewport({ scale: 2 });
+                    var canvas = document.getElementById('pdfCanvas');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(renderPins);
+                });
+            });
+            </text>
+        }
+        else
+        {
+            <text>
+            var img = document.getElementById('floorPlanImg');
+            if (img.complete) renderPins(); else img.addEventListener('load', renderPins);
+            </text>
+        }
+
+        // Re-render on window resize so pin positions stay accurate
+        window.addEventListener('resize', renderPins);
+    </script>
+}
