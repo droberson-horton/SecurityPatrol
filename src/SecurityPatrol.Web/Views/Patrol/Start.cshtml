@@ -4,9 +4,12 @@
 }
 
 <div class="page-header">
-    <div class="container">
-        <h2 class="mb-0"><i class="fas fa-play-circle me-2"></i>Start Security Patrol</h2>
-        <small class="opacity-75">Select a route and begin your patrol</small>
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-play-circle me-2"></i>Start Security Patrol</h2>
+            <small class="opacity-75">Select a route and begin your patrol</small>
+        </div>
+        @await Html.PartialAsync("_DashboardButton")
     </div>
 </div>
 

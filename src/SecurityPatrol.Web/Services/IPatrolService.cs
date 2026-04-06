@@ -8,6 +8,8 @@ public class PatrolFilters
     public string? OfficerId { get; set; }
     public DateTime? FromDate { get; set; }
     public DateTime? ToDate { get; set; }
+    public TimeSpan? TimeFrom { get; set; }
+    public TimeSpan? TimeTo { get; set; }
     public PatrolStatus? Status { get; set; }
     public int? BuildingId { get; set; }
     public int? FloorId { get; set; }

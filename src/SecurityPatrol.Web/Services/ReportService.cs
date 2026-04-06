@@ -62,6 +62,34 @@ public class ReportService : IReportService
         };
     }
 
+    public async Task<MissedReportViewModel> GetMissedReportAsync(PatrolFilters filters)
+    {
+        var missedLocations = await _patrolService.GetMissedLocationsAsync(filters);
+
+        var officers = await _db.Users
+            .Where(u => u.Role == UserRole.SecurityOfficer || u.Role == UserRole.Administrator)
+            .OrderBy(u => u.LastName)
+            .ToListAsync();
+
+        var buildings = await _db.Buildings
+            .Where(b => b.IsActive)
+            .OrderBy(b => b.Name)
+            .ToListAsync();
+
+        return new MissedReportViewModel
+        {
+            MissedLocations = missedLocations,
+            FromDate = filters.FromDate,
+            ToDate = filters.ToDate,
+            TimeFrom = filters.TimeFrom,
+            TimeTo = filters.TimeTo,
+            OfficerFilter = filters.OfficerId,
+            BuildingFilter = filters.BuildingId,
+            Officers = officers,
+            Buildings = buildings
+        };
+    }
+
     public async Task<RoleReportViewModel> GetRoleReportAsync()
     {
         var users = await _db.Users.ToListAsync();

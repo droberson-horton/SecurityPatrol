@@ -43,9 +43,21 @@ public class PatrolService : IPatrolService
 
         var missed = new List<MissedLocationItem>();
 
+        var now = DateTime.UtcNow;
+
         foreach (var sw in scheduledPatrols)
         {
             if (sw.PatrolRoute == null)
+                continue;
+
+            // Only count missed locations after the scheduled end time has passed
+            if (sw.ScheduledDate.Date + sw.EndTime > now)
+                continue;
+
+            // Filter by time-of-day range if specified
+            if (filters.TimeFrom.HasValue && sw.StartTime < filters.TimeFrom.Value)
+                continue;
+            if (filters.TimeTo.HasValue && sw.StartTime > filters.TimeTo.Value)
                 continue;
 
             var scannedLocationIds = sw.Patrols
@@ -68,6 +80,9 @@ public class PatrolService : IPatrolService
                     {
                         ScheduledPatrolId = sw.Id,
                         ScheduledDate = sw.ScheduledDate,
+                        ScheduledStartTime = sw.StartTime,
+                        ScheduledEndTime = sw.EndTime,
+                        OfficerId = sw.OfficerId,
                         OfficerName = sw.Officer.FullName,
                         RouteName = sw.PatrolRoute.Name,
                         LocationName = wrl.Location.Name,

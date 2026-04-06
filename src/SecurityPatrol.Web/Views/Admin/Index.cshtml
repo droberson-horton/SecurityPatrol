@@ -11,60 +11,19 @@
 </div>
 
 <div class="container">
-    <div class="row g-3 mb-5">
-        <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm h-100">
-                <div class="card-body py-4">
-                    <i class="fas fa-users fa-2x text-primary mb-2"></i>
-                    <div class="fs-3 fw-bold text-primary">@Model.TotalUsers</div>
-                    <div class="small text-muted">Total Users</div>
-                    <div class="small text-muted">(@Model.ActiveOfficers active officers)</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm h-100">
-                <div class="card-body py-4">
-                    <i class="fas fa-building fa-2x text-info mb-2"></i>
-                    <div class="fs-3 fw-bold text-info">@Model.TotalBuildings</div>
-                    <div class="small text-muted">Buildings</div>
-                    <div class="small text-muted">(@Model.TotalLocations locations)</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm h-100">
-                <div class="card-body py-4">
-                    <i class="fas fa-walking fa-2x text-success mb-2"></i>
-                    <div class="fs-3 fw-bold text-success">@Model.PatrolsToday</div>
-                    <div class="small text-muted">Patrols Today</div>
-                    <div class="small text-muted">(@Model.ScheduledPatrolsToday scheduled)</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm h-100 @(Model.MissedLocationsToday > 0 ? "border-danger" : "")">
-                <div class="card-body py-4">
-                    <i class="fas fa-exclamation-triangle fa-2x @(Model.MissedLocationsToday > 0 ? "text-danger" : "text-muted") mb-2"></i>
-                    <div class="fs-3 fw-bold @(Model.MissedLocationsToday > 0 ? "text-danger" : "text-muted")">@Model.MissedLocationsToday</div>
-                    <div class="small text-muted">Missed Today</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="row g-4">
         @{
+            var missedColor = Model.MissedLocationsToday > 0 ? "text-danger" : "text-muted";
             var sections = new[]
             {
-                new { Icon = "fas fa-building", Title = "Site Admin", Desc = "Manage buildings, floors, and scan locations", Link = "/SiteAdmin", Color = "text-info" },
-                new { Icon = "fas fa-users", Title = "User Admin", Desc = "Create and manage officer and auditor accounts", Link = "/Admin/Users", Color = "text-primary" },
-                new { Icon = "fas fa-calendar-alt", Title = "Schedules", Desc = "Create and manage patrol schedules", Link = "/Admin/Schedules", Color = "text-success" },
-                new { Icon = "fas fa-route", Title = "Patrol Routes", Desc = "Define patrol routes and location order", Link = "/Admin/Routes", Color = "text-warning" },
-                new { Icon = "fas fa-qrcode", Title = "QR Codes", Desc = "Generate and print QR codes for locations", Link = "/Admin/QrCodes", Color = "text-dark" },
-                new { Icon = "fas fa-bell", Title = "Messages", Desc = "Post messages visible to all officers", Link = "/Admin/Messages", Color = "text-danger" },
-                new { Icon = "fas fa-search", Title = "Audit", Desc = "Review missed locations and patrol compliance", Link = "/Audit", Color = "text-secondary" },
-                new { Icon = "fas fa-chart-bar", Title = "Reports", Desc = "Patrol history and role-based reports", Link = "/Report", Color = "text-primary" }
+                new { Icon = "fas fa-users",          Title = "User Admin",         Desc = "Create and manage officer and auditor accounts",    Link = "/Admin/Users",             Color = "text-primary",   Stat = $"{Model.TotalUsers} users · {Model.ActiveOfficers} active officers",              StatColor = "text-primary" },
+                new { Icon = "fas fa-building",       Title = "Site Admin",         Desc = "Manage buildings, floors, and scan locations",      Link = "/SiteAdmin",               Color = "text-info",      Stat = $"{Model.TotalBuildings} buildings · {Model.TotalLocations} locations",             StatColor = "text-info" },
+                new { Icon = "fas fa-calendar-alt",   Title = "Schedules",          Desc = "Create and manage patrol schedules",                Link = "/Admin/Schedules",         Color = "text-success",   Stat = $"{Model.PatrolsToday} patrols today · {Model.ScheduledPatrolsToday} scheduled", StatColor = "text-success" },
+                new { Icon = "fas fa-route",          Title = "Patrol Routes",      Desc = "Define patrol routes and location order",           Link = "/Admin/Routes",            Color = "text-warning",   Stat = $"{Model.MissedLocationsToday} missed today",                                    StatColor = missedColor },
+                new { Icon = "fas fa-qrcode",         Title = "QR Codes",           Desc = "Generate and print QR codes for locations",         Link = "/Admin/QrCodes",           Color = "text-dark",      Stat = "",                                                                              StatColor = "" },
+                new { Icon = "fas fa-clipboard-list", Title = "Schedule Templates", Desc = "Define reusable schedule templates",                Link = "/Admin/ScheduleTemplates", Color = "text-secondary", Stat = "",                                                                              StatColor = "" },
+                new { Icon = "fas fa-bell",           Title = "Messages",           Desc = "Post messages visible to all officers",             Link = "/Admin/Messages",          Color = "text-danger",    Stat = "",                                                                              StatColor = "" },
+                new { Icon = "fas fa-chart-bar",      Title = "Reports",            Desc = "Patrol history and role-based reports",             Link = "/Report",                  Color = "text-primary",   Stat = "",                                                                              StatColor = "" }
             };
         }
         @foreach (var s in sections)
@@ -76,6 +35,10 @@
                             <i class="@s.Icon fa-2x @s.Color mb-3"></i>
                             <h6 class="fw-bold mb-1">@s.Title</h6>
                             <p class="small text-muted mb-0">@s.Desc</p>
+                            @if (!string.IsNullOrEmpty(s.Stat))
+                            {
+                                <p class="small fw-semibold mt-2 mb-0 @s.StatColor">@s.Stat</p>
+                            }
                         </div>
                     </div>
                 </a>

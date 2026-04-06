@@ -1,0 +1,10 @@
+@using SecurityPatrol.Web.Models
+@using System.Security.Claims
+@{
+    bool isAdmin   = User.HasClaim(ClaimTypes.Role, UserRole.Administrator.ToString());
+    bool isOfficer = User.HasClaim(ClaimTypes.Role, UserRole.SecurityOfficer.ToString());
+    string dashUrl = isAdmin ? "/Admin" : (isOfficer ? "/Dashboard/Officer" : "/Report");
+}
+<a href="@dashUrl" class="btn btn-light">
+    <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+</a>

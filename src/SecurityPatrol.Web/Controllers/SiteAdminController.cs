@@ -23,7 +23,7 @@ public class SiteAdminController : Controller
             .Include(b => b.Floors.Where(f => f.IsActive).OrderBy(f => f.FloorNumber))
                 .ThenInclude(f => f.Locations.Where(l => l.IsActive).OrderBy(l => l.Name))
             .Where(b => b.IsActive)
-            .OrderBy(b => b.Name)
+            .OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
             .ToListAsync();
 
         ViewBag.TimeZones = TimeZoneInfo.GetSystemTimeZones();
@@ -195,6 +195,25 @@ public class SiteAdminController : Controller
         await _db.SaveChangesAsync();
         TempData["Success"] = "Location deactivated.";
         return RedirectToAction(nameof(Index), new { open = buildingId });
+    }
+
+    // ---- Building Ordering ----
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReorderBuildings([FromBody] List<int> buildingIds)
+    {
+        if (buildingIds == null || !buildingIds.Any())
+            return BadRequest();
+
+        var buildings = await _db.Buildings.Where(b => buildingIds.Contains(b.Id)).ToListAsync();
+        for (int i = 0; i < buildingIds.Count; i++)
+        {
+            var building = buildings.FirstOrDefault(b => b.Id == buildingIds[i]);
+            if (building != null)
+                building.SortOrder = i;
+        }
+        await _db.SaveChangesAsync();
+        return Ok();
     }
 
     // Ajax endpoint for cascading floor dropdown

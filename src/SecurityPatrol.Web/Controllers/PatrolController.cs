@@ -176,6 +176,40 @@ public class PatrolController : Controller
         return RedirectToAction("Scan", new { qrCode, patrolId });
     }
 
+    [HttpGet]
+    public async Task<IActionResult> ScanView(int patrolScanId)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Challenge();
+
+        var scan = await _db.PatrolScans
+            .Include(ws => ws.Patrol)
+            .Include(ws => ws.Location)
+                .ThenInclude(l => l.Floor)
+            .Include(ws => ws.Location)
+                .ThenInclude(l => l.Building)
+            .FirstOrDefaultAsync(ws => ws.Id == patrolScanId);
+
+        if (scan == null || scan.Patrol.OfficerId != user.Id)
+            return NotFound();
+
+        var vm = new PatrolScanViewModel
+        {
+            PatrolId      = scan.PatrolId,
+            PatrolScanId  = scan.Id,
+            LocationName  = scan.Location.Name,
+            FloorName     = scan.Location.Floor?.Name,
+            BuildingName  = scan.Location.Building.Name,
+            TimeZoneId    = scan.Location.Building.TimeZoneId,
+            ExistingNotes = scan.Notes,
+            PhotoPath     = scan.PhotoPath,
+            ScannedAt     = scan.ScannedAt,
+            QrCode        = scan.Location.QrCode
+        };
+
+        return View("Scan", vm);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Note(int patrolScanId, string note, int patrolId)
@@ -203,7 +237,8 @@ public class PatrolController : Controller
             await _db.SaveChangesAsync();
         }
 
-        return RedirectToAction("Active", new { patrolId });
+        TempData["Success"] = "Note saved.";
+        return RedirectToAction("ScanView", new { patrolScanId });
     }
 
     [HttpPost]
@@ -245,7 +280,8 @@ public class PatrolController : Controller
             await _db.SaveChangesAsync();
         }
 
-        return RedirectToAction("Active", new { patrolId });
+        TempData["Success"] = "Photo uploaded.";
+        return RedirectToAction("ScanView", new { patrolScanId });
     }
 
     [HttpPost]
