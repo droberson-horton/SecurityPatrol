@@ -35,7 +35,7 @@
         <div id="mapWrapper" style="position:relative; width:100%; max-width:1200px; margin:0 auto;">
             @if (isPdf)
             {
-                <canvas id="pdfCanvas" style="width:100%; display:block; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15);"></canvas>
+                <canvas id="pdfCanvas" style="width:100%; height:auto; display:block; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15);"></canvas>
             }
             else
             {
@@ -167,9 +167,13 @@
                     var scale    = 2;
                     var viewport = page.getViewport({ scale: scale });
                     var canvas   = document.getElementById('pdfCanvas');
-                    canvas.height = viewport.height;
                     canvas.width  = viewport.width;
-                    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(renderPins);
+                    canvas.height = viewport.height;
+                    canvas.style.width  = '100%';
+                    canvas.style.height = 'auto';
+                    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function () {
+                        requestAnimationFrame(renderPins);
+                    });
                 });
             });
         } else {

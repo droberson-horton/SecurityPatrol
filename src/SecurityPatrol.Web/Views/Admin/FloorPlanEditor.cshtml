@@ -99,16 +99,16 @@
     </div>
 
     <!-- ── Map area ── -->
-    <div style="flex:1; overflow:auto; background:#e9ecef; display:flex; align-items:flex-start; justify-content:center; padding:16px;">
-        <div id="mapWrapper" style="position:relative; display:inline-block; max-width:100%;">
+    <div style="flex:1; overflow:auto; background:#e9ecef; padding:16px;">
+        <div id="mapWrapper" style="position:relative;">
             @if (Model.FloorPlan.FileType == "pdf")
             {
-                <canvas id="pdfCanvas" style="display:block; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.2);"></canvas>
+                <canvas id="pdfCanvas" style="display:block; width:100%; height:auto; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.2);"></canvas>
             }
             else
             {
                 <img id="floorPlanImg" src="/uploads/floorplans/@Model.FloorPlan.StoredFileName"
-                     style="display:block; max-width:100%; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.2);"
+                     style="display:block; width:100%; height:auto; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.2);"
                      alt="Floor Plan" />
             }
             <svg id="mapOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%;"></svg>
@@ -467,9 +467,15 @@
                 pdf.getPage(1).then(function (page) {
                     var viewport = page.getViewport({ scale: 2 });
                     var canvas = document.getElementById('pdfCanvas');
+                    // Set attribute dimensions (rendering resolution)
+                    canvas.width  = viewport.width;
                     canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(renderPins);
+                    // CSS constrains display size; height:auto maintains aspect ratio
+                    canvas.style.width  = '100%';
+                    canvas.style.height = 'auto';
+                    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function () {
+                        requestAnimationFrame(renderPins);
+                    });
                 });
             });
             </text>
@@ -478,7 +484,11 @@
         {
             <text>
             var img = document.getElementById('floorPlanImg');
-            if (img.complete) renderPins(); else img.addEventListener('load', renderPins);
+            if (img.complete) {
+                requestAnimationFrame(renderPins);
+            } else {
+                img.addEventListener('load', function() { requestAnimationFrame(renderPins); });
+            }
             </text>
         }
 
