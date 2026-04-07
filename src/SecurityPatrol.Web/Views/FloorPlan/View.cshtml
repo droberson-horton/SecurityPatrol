@@ -115,6 +115,7 @@
         ));
 
         var fileType = '@Html.Raw(Model.FloorPlan.FileType)';
+        var pinRadius = @Model.FloorPlan.PinRadius;
 
         function renderPins() {
             var svg     = document.getElementById('mapOverlay');
@@ -135,17 +136,17 @@
                 var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
                 circle.setAttribute('cx', cx);
                 circle.setAttribute('cy', cy);
-                circle.setAttribute('r', 16);
+                circle.setAttribute('r', pinRadius);
                 circle.setAttribute('fill', '#003087');
                 circle.setAttribute('stroke', 'white');
                 circle.setAttribute('stroke-width', '2');
 
                 var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', cx);
-                text.setAttribute('y', cy + 5);
+                text.setAttribute('y', cy + pinRadius * 0.28);
                 text.setAttribute('text-anchor', 'middle');
                 text.setAttribute('fill', 'white');
-                text.setAttribute('font-size', '12');
+                text.setAttribute('font-size', Math.round(pinRadius * 0.67));
                 text.setAttribute('font-weight', 'bold');
                 text.textContent = (i + 1).toString();
 

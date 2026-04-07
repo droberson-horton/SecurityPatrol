@@ -23,6 +23,8 @@ public class FloorPlan
     [MaxLength(200)]
     public string? Label { get; set; }
 
+    public int PinRadius { get; set; } = 18;
+
     public bool IsActive { get; set; } = true;
 
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;

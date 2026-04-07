@@ -978,4 +978,17 @@ public class AdminController : Controller
 
         return Json(new { success = true });
     }
+
+    [HttpPost]
+    public async Task<IActionResult> SavePinSize([FromBody] SavePinSizeRequest request)
+    {
+        var plan = await _db.FloorPlans.FindAsync(request.FloorPlanId)
+                   ?? throw new InvalidOperationException("Floor plan not found.");
+
+        plan.PinRadius = Math.Clamp(request.PinRadius, 8, 40);
+
+        await _db.SaveChangesAsync();
+
+        return Json(new { success = true });
+    }
 }

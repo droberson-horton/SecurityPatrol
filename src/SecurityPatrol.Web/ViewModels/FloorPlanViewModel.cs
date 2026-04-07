@@ -63,3 +63,9 @@ public class RemovePinRequest
 {
     public int LocationId { get; set; }
 }
+
+public class SavePinSizeRequest
+{
+    public int FloorPlanId { get; set; }
+    public int PinRadius { get; set; }
+}

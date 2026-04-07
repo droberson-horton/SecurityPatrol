@@ -41,6 +41,10 @@ namespace SecurityPatrol.Web.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int>("PinRadius")
+                        .HasColumnType("int")
+                        .HasDefaultValue(18);
+
                     b.Property<string>("Label")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");

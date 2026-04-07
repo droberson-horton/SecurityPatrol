@@ -46,6 +46,15 @@
             </div>
         </div>
 
+        <!-- Pin size -->
+        <div class="p-3 border-bottom">
+            <label class="form-label small fw-semibold text-muted">PIN SIZE</label>
+            <div class="d-flex align-items-center gap-2">
+                <input type="range" id="pinSizeSlider" class="form-range flex-fill" min="8" max="40" value="@Model.FloorPlan.PinRadius" oninput="onPinSizeChange(parseInt(this.value));" />
+                <span id="pinSizeValue" class="small text-muted" style="min-width:24px; text-align:right;">@Model.FloorPlan.PinRadius</span>
+            </div>
+        </div>
+
         <!-- Unmapped locations -->
         <div class="p-3 border-bottom">
             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -157,6 +166,8 @@
         var selectedPinId = null;
         var pendingX = 0, pendingY = 0;
         var pendingUnmappedId = null;
+        var pinRadius = @Model.FloorPlan.PinRadius;
+        var floorPlanId = @Model.FloorPlan.Id;
         var isDragging = false;
         var dragPinId = null;
         var dragStartX = 0, dragStartY = 0;
@@ -203,17 +214,17 @@
                 var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
                 circle.setAttribute('cx', cx);
                 circle.setAttribute('cy', cy);
-                circle.setAttribute('r', 18);
+                circle.setAttribute('r', pinRadius);
                 circle.setAttribute('fill', isSelected ? '#ffc107' : '#003087');
                 circle.setAttribute('stroke', isSelected ? '#856404' : 'white');
                 circle.setAttribute('stroke-width', isSelected ? '3' : '2');
 
                 var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', cx);
-                text.setAttribute('y', cy + 5);
+                text.setAttribute('y', cy + pinRadius * 0.28);
                 text.setAttribute('text-anchor', 'middle');
                 text.setAttribute('fill', isSelected ? '#212529' : 'white');
-                text.setAttribute('font-size', '12');
+                text.setAttribute('font-size', Math.round(pinRadius * 0.67));
                 text.setAttribute('font-weight', 'bold');
                 text.setAttribute('pointer-events', 'none');
                 text.textContent = (i + 1).toString();
@@ -239,6 +250,22 @@
 
                 svg.appendChild(g);
             });
+        }
+
+        // ---- Pin size ----
+        var pinSizeSaveTimer = null;
+        function onPinSizeChange(val) {
+            pinRadius = val;
+            document.getElementById('pinSizeValue').textContent = val;
+            renderPins();
+            clearTimeout(pinSizeSaveTimer);
+            pinSizeSaveTimer = setTimeout(function () {
+                fetch('/Admin/SavePinSize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                    body: JSON.stringify({ floorPlanId: floorPlanId, pinRadius: val })
+                });
+            }, 600);
         }
 
         // ---- Drag to move pins ----
