@@ -783,20 +783,20 @@ public class AdminController : Controller
         if (file == null || file.Length == 0)
         {
             TempData["Error"] = "Please select a file to upload.";
-            return RedirectToAction(nameof(FloorPlans));
+            return RedirectToAction("Index", "SiteAdmin");
         }
 
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!allowed.Contains(ext))
         {
             TempData["Error"] = "Invalid file type. Allowed types: jpg, jpeg, png, gif, webp, pdf.";
-            return RedirectToAction(nameof(FloorPlans));
+            return RedirectToAction("Index", "SiteAdmin");
         }
 
         if (file.Length > maxBytes)
         {
             TempData["Error"] = "File exceeds the 20 MB size limit.";
-            return RedirectToAction(nameof(FloorPlans));
+            return RedirectToAction("Index", "SiteAdmin");
         }
 
         var storedFileName = $"{Guid.NewGuid()}{ext}";
@@ -826,7 +826,7 @@ public class AdminController : Controller
         await _db.SaveChangesAsync();
 
         TempData["Success"] = "Floor plan uploaded.";
-        return RedirectToAction(nameof(FloorPlans));
+        return RedirectToAction(nameof(FloorPlanEditor), new { id = plan.Id });
     }
 
     [HttpGet]
@@ -842,10 +842,12 @@ public class AdminController : Controller
 
         var mappedLocations = await _db.Locations
             .Where(l => l.FloorPlanId == id && l.IsActive)
+            .OrderBy(l => l.PatrolOrder).ThenBy(l => l.Name)
             .ToListAsync();
 
         var unmappedLocations = await _db.Locations
             .Where(l => l.FloorId == plan.FloorId && l.IsActive && l.FloorPlanId == null)
+            .OrderBy(l => l.PatrolOrder).ThenBy(l => l.Name)
             .ToListAsync();
 
         var vm = new FloorPlanEditorViewModel

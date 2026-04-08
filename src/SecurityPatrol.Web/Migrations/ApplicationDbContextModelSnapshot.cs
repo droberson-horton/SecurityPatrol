@@ -442,6 +442,10 @@ b.Property<string>("TimeZoneId")
                     b.Property<double?>("MapX")
                         .HasColumnType("float");
 
+                    b.Property<int>("PatrolOrder")
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<double?>("MapY")
                         .HasColumnType("float");
 

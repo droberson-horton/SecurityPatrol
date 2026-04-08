@@ -21,7 +21,9 @@ public class SiteAdminController : Controller
     {
         var buildings = await _db.Buildings
             .Include(b => b.Floors.Where(f => f.IsActive).OrderBy(f => f.FloorNumber))
-                .ThenInclude(f => f.Locations.Where(l => l.IsActive).OrderBy(l => l.Name))
+                .ThenInclude(f => f.Locations.Where(l => l.IsActive).OrderBy(l => l.PatrolOrder).ThenBy(l => l.Name))
+            .Include(b => b.Floors.Where(f => f.IsActive).OrderBy(f => f.FloorNumber))
+                .ThenInclude(f => f.FloorPlans.Where(fp => fp.IsActive))
             .Where(b => b.IsActive)
             .OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
             .ToListAsync();
@@ -211,6 +213,25 @@ public class SiteAdminController : Controller
             var building = buildings.FirstOrDefault(b => b.Id == buildingIds[i]);
             if (building != null)
                 building.SortOrder = i;
+        }
+        await _db.SaveChangesAsync();
+        return Ok();
+    }
+
+    // ---- Location Patrol Order ----
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReorderLocations([FromBody] List<int> locationIds)
+    {
+        if (locationIds == null || !locationIds.Any())
+            return BadRequest();
+
+        var locations = await _db.Locations.Where(l => locationIds.Contains(l.Id)).ToListAsync();
+        for (int i = 0; i < locationIds.Count; i++)
+        {
+            var loc = locations.FirstOrDefault(l => l.Id == locationIds[i]);
+            if (loc != null)
+                loc.PatrolOrder = i;
         }
         await _db.SaveChangesAsync();
         return Ok();

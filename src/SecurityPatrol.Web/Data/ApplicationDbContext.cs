@@ -54,7 +54,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.FileType).HasMaxLength(10);
             entity.Property(e => e.Label).HasMaxLength(200);
             entity.HasOne(e => e.Floor)
-                .WithMany()
+                .WithMany(f => f.FloorPlans)
                 .HasForeignKey(e => e.FloorId)
                 .OnDelete(DeleteBehavior.Restrict);
         });

@@ -20,7 +20,7 @@
         </div>
         <div class="d-flex gap-2">
             @await Html.PartialAsync("_DashboardButton")
-            <a href="/Admin/FloorPlans" class="btn btn-light"><i class="fas fa-arrow-left me-1"></i>Floor Plans</a>
+            <a href="javascript:history.back()" class="btn btn-light"><i class="fas fa-arrow-left me-1"></i>Back</a>
             <a href="/FloorPlan/View/@Model.FloorPlan.Id" class="btn btn-light" target="_blank"><i class="fas fa-eye me-1"></i>Preview</a>
         </div>
     </div>
@@ -49,9 +49,14 @@
         <!-- Pin size -->
         <div class="p-3 border-bottom">
             <label class="form-label small fw-semibold text-muted">PIN SIZE</label>
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 mb-2">
                 <input type="range" id="pinSizeSlider" class="form-range flex-fill" min="8" max="40" value="@Model.FloorPlan.PinRadius" oninput="onPinSizeChange(parseInt(this.value));" />
-                <span id="pinSizeValue" class="small text-muted" style="min-width:24px; text-align:right;">@Model.FloorPlan.PinRadius</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <button class="btn btn-sm btn-outline-secondary" onclick="onPinSizeChange(Math.max(8, pinRadius - 1));" type="button"><i class="fas fa-minus"></i></button>
+                <input type="number" id="pinSizeNumber" class="form-control form-control-sm text-center" min="8" max="40" value="@Model.FloorPlan.PinRadius"
+                       oninput="onPinSizeChange(Math.min(40, Math.max(8, parseInt(this.value) || 8)));" style="width:64px;" />
+                <button class="btn btn-sm btn-outline-secondary" onclick="onPinSizeChange(Math.min(40, pinRadius + 1));" type="button"><i class="fas fa-plus"></i></button>
             </div>
         </div>
 
@@ -256,7 +261,8 @@
         var pinSizeSaveTimer = null;
         function onPinSizeChange(val) {
             pinRadius = val;
-            document.getElementById('pinSizeValue').textContent = val;
+            document.getElementById('pinSizeSlider').value = val;
+            document.getElementById('pinSizeNumber').value = val;
             renderPins();
             clearTimeout(pinSizeSaveTimer);
             pinSizeSaveTimer = setTimeout(function () {

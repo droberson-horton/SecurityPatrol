@@ -16,9 +16,6 @@
         </div>
         <div class="d-flex gap-2">
             @await Html.PartialAsync("_DashboardButton")
-            <a href="/Admin/FloorPlans" class="btn btn-light">
-                <i class="fas fa-map me-1"></i>Floor Plans
-            </a>
             <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addBuildingModal">
                 <i class="fas fa-plus me-1"></i>Add Building
             </button>
@@ -118,6 +115,29 @@
                                                 <span class="badge bg-success ms-2 small">Active</span>
                                             </div>
                                             <div class="d-flex gap-2 align-items-center">
+                                                @{
+                                                    var floorPlans = floor.FloorPlans.ToList();
+                                                }
+                                                @if (floorPlans.Count == 0)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-info"
+                                                            data-bs-toggle="modal" data-bs-target="#uploadFloorPlanModal"
+                                                            data-floorid="@floor.Id"
+                                                            data-floorname="@floor.Name"
+                                                            data-buildingname="@building.Name">
+                                                        <i class="fas fa-map me-1"></i>Floor Plans
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    var fpUrl = floorPlans.Count == 1
+                                                        ? $"/Admin/FloorPlanEditor/{floorPlans[0].Id}"
+                                                        : "/Admin/FloorPlans";
+                                                    <a href="@fpUrl" class="btn btn-sm btn-outline-info">
+                                                        <i class="fas fa-map me-1"></i>Floor Plans
+                                                        <span class="badge bg-info text-dark ms-1">@floorPlans.Count</span>
+                                                    </a>
+                                                }
                                                 <button class="btn btn-sm btn-outline-success"
                                                         data-bs-toggle="modal" data-bs-target="#addLocationModal"
                                                         data-buildingid="@building.Id"
@@ -154,23 +174,28 @@
                                                 <table class="table table-sm table-hover mb-0">
                                                     <thead class="table-light">
                                                         <tr>
-                                                            <th class="ps-4">Name</th>
+                                                            <th style="width:32px;"></th>
+                                                            <th style="width:48px;" class="text-center">#</th>
+                                                            <th class="ps-2">Name</th>
                                                             <th>Description</th>
-                                                            <th>QR Code</th>
                                                             <th>Active</th>
                                                             <th>Actions</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody>
+                                                    <tbody class="location-sortable" data-floorid="@floor.Id">
+                                                        @{ int patrolNum = 1; }
                                                         @foreach (var loc in floor.Locations)
                                                         {
-                                                            <tr>
-                                                                <td class="ps-4 fw-semibold small">@loc.Name</td>
-                                                                <td class="small text-muted">@(loc.Description ?? "-")</td>
-                                                                <td class="small font-monospace text-muted">
-                                                                    @(loc.QrCode.Length > 20 ? loc.QrCode.Substring(0, 20) + "…" : loc.QrCode)
+                                                            <tr data-id="@loc.Id">
+                                                                <td class="text-center align-middle">
+                                                                    <i class="fas fa-grip-vertical text-muted location-drag-handle" style="cursor:grab;" title="Drag to reorder"></i>
                                                                 </td>
-                                                                <td>
+                                                                <td class="text-center align-middle">
+                                                                    <span class="badge bg-primary">@(patrolNum++)</span>
+                                                                </td>
+                                                                <td class="ps-2 fw-semibold small align-middle">@loc.Name</td>
+                                                                <td class="small text-muted align-middle">@(loc.Description ?? "-")</td>
+                                                                <td class="align-middle">
                                                                     @if (loc.IsActive)
                                                                     {
                                                                         <span class="badge bg-success">Active</span>
@@ -180,7 +205,7 @@
                                                                         <span class="badge bg-secondary">Inactive</span>
                                                                     }
                                                                 </td>
-                                                                <td>
+                                                                <td class="align-middle">
                                                                     <button class="btn btn-sm btn-outline-primary me-1"
                                                                             data-bs-toggle="modal" data-bs-target="#editLocationModal"
                                                                             data-id="@loc.Id"
@@ -452,6 +477,42 @@
     </div>
 </div>
 
+<!-- Upload Floor Plan Modal -->
+<div class="modal fade" id="uploadFloorPlanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#003087; color:white;">
+                <h5 class="modal-title"><i class="fas fa-map me-2"></i>No Floor Plan</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/Admin/UploadFloorPlan" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="floorId" id="uploadFpFloorId" />
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        No floor plan has been uploaded for <strong id="uploadFpFloorName"></strong>.
+                        Upload one below to start placing checkpoint pins.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Label <span class="text-muted fw-normal small">(optional)</span></label>
+                        <input type="text" name="label" class="form-control" maxlength="200" placeholder="e.g. Floor 1 Layout" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">File <span class="text-danger">*</span></label>
+                        <input type="file" name="file" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" required />
+                        <div class="form-text">Supported formats: JPG, PNG, GIF, WEBP, PDF &mdash; max 20 MB</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="/SiteAdmin" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-upload me-1"></i>Upload &amp; Open Editor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script>
@@ -482,6 +543,41 @@
                 handle.addEventListener('click', function (e) { e.stopPropagation(); });
             });
         }
+
+        // Location drag-to-reorder (patrol order)
+        document.querySelectorAll('.location-sortable').forEach(function (tbody) {
+            new Sortable(tbody, {
+                animation: 150,
+                handle: '.location-drag-handle',
+                ghostClass: 'table-active',
+                onEnd: function () {
+                    var ids = Array.from(tbody.querySelectorAll('tr[data-id]'))
+                        .map(function (tr) { return parseInt(tr.dataset.id); });
+
+                    // Update badge numbers in-place
+                    tbody.querySelectorAll('tr[data-id]').forEach(function (tr, idx) {
+                        tr.querySelector('.badge.bg-primary').textContent = idx + 1;
+                    });
+
+                    fetch('/SiteAdmin/ReorderLocations', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        },
+                        body: JSON.stringify(ids)
+                    });
+                }
+            });
+        });
+
+        // Upload Floor Plan Modal
+        document.getElementById('uploadFloorPlanModal').addEventListener('show.bs.modal', function (e) {
+            var btn = e.relatedTarget;
+            document.getElementById('uploadFpFloorId').value = btn.dataset.floorid;
+            document.getElementById('uploadFpFloorName').textContent =
+                btn.dataset.floorname + ', ' + btn.dataset.buildingname;
+        });
 
         // Edit Building Modal
         document.getElementById('editBuildingModal').addEventListener('show.bs.modal', function (e) {

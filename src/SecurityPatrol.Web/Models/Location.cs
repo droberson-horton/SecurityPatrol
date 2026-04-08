@@ -23,6 +23,8 @@ public class Location
 
     public bool IsActive { get; set; } = true;
 
+    public int PatrolOrder { get; set; } = 0;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Floor plan pin coordinates (0.0–1.0 as fraction of image dimensions)

@@ -18,4 +18,5 @@ public class Floor
 
     public Building Building { get; set; } = null!;
     public ICollection<Location> Locations { get; set; } = new List<Location>();
+    public ICollection<FloorPlan> FloorPlans { get; set; } = new List<FloorPlan>();
 }

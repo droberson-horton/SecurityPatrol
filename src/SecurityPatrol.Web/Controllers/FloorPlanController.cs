@@ -61,7 +61,7 @@ public class FloorPlanController : Controller
             FloorPlan = plan,
             Locations = plan.Locations
                 .Where(l => l.IsActive && l.MapX.HasValue && l.MapY.HasValue)
-                .OrderBy(l => l.Name)
+                .OrderBy(l => l.PatrolOrder).ThenBy(l => l.Name)
                 .ToList()
         });
     }
