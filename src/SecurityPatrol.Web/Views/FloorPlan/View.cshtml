@@ -20,9 +20,6 @@
                     <i class="fas fa-edit me-1"></i>Edit Map
                 </a>
             }
-            <a href="/FloorPlan" class="btn btn-light">
-                <i class="fas fa-arrow-left me-1"></i>Back
-            </a>
             @await Html.PartialAsync("_DashboardButton")
         </div>
     </div>
@@ -117,17 +114,84 @@
         var fileType = '@Html.Raw(Model.FloorPlan.FileType)';
         var pinRadius = @Model.FloorPlan.PinRadius;
 
+        var segmentWaypoints = {};
+        (function() {
+            var raw = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Waypoints));
+            raw.forEach(function(w) {
+                var key = w.fromLocationId + '-' + w.toLocationId;
+                if (!segmentWaypoints[key]) segmentWaypoints[key] = [];
+                segmentWaypoints[key][w.orderIndex] = { x: w.x, y: w.y };
+            });
+            Object.keys(segmentWaypoints).forEach(function(k) {
+                segmentWaypoints[k] = segmentWaypoints[k].filter(Boolean);
+            });
+        })();
+
+        function clipToward(from, to, dist) {
+            var dx = to.x - from.x, dy = to.y - from.y;
+            var len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return { x: from.x, y: from.y };
+            return { x: from.x + dx / len * dist, y: from.y + dy / len * dist };
+        }
+
+        function renderArrows(svg, w, h) {
+            var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            var marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            marker.setAttribute('id', 'patrol-arrow-v');
+            marker.setAttribute('viewBox', '0 0 10 8');
+            marker.setAttribute('refX', '9');
+            marker.setAttribute('refY', '4');
+            marker.setAttribute('markerWidth', '10');
+            marker.setAttribute('markerHeight', '8');
+            marker.setAttribute('orient', 'auto');
+            marker.setAttribute('markerUnits', 'userSpaceOnUse');
+            var poly = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            poly.setAttribute('d', 'M 0 0 L 10 4 L 0 8 z');
+            poly.setAttribute('fill', '#0d6efd');
+            marker.appendChild(poly);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+
+            var arrowOffset = pinRadius + 10;
+            for (var i = 0; i < pins.length - 1; i++) {
+                var pA = pins[i], pB = pins[i + 1];
+                var key = pA.id + '-' + pB.id;
+                var wpts = (segmentWaypoints[key] || []).map(function(wp) {
+                    return { x: wp.x * w, y: wp.y * h };
+                });
+                var all = [{ x: pA.x * w, y: pA.y * h }].concat(wpts).concat([{ x: pB.x * w, y: pB.y * h }]);
+                var pStart = clipToward(all[0], all[1] || all[0], pinRadius + 2);
+                var last = all.length - 1;
+                var pEnd = clipToward(all[last], all[last - 1] || all[last], arrowOffset);
+                var dx = pEnd.x - pStart.x, dy = pEnd.y - pStart.y;
+                if (wpts.length === 0 && Math.sqrt(dx * dx + dy * dy) < 5) continue;
+                var pts = [pStart].concat(wpts).concat([pEnd]);
+                var d = 'M ' + pts.map(function(p) { return p.x.toFixed(1) + ' ' + p.y.toFixed(1); }).join(' L ');
+                var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', d);
+                pathEl.setAttribute('stroke', '#0d6efd');
+                pathEl.setAttribute('stroke-width', '2');
+                pathEl.setAttribute('fill', 'none');
+                pathEl.setAttribute('marker-end', 'url(#patrol-arrow-v)');
+                pathEl.setAttribute('pointer-events', 'none');
+                svg.appendChild(pathEl);
+            }
+        }
+
         function renderPins() {
             var svg     = document.getElementById('mapOverlay');
             var wrapper = document.getElementById('mapWrapper');
             if (!svg || !wrapper) return;
 
-            svg.setAttribute('viewBox', '0 0 ' + wrapper.offsetWidth + ' ' + wrapper.offsetHeight);
+            var w = wrapper.offsetWidth, h = wrapper.offsetHeight;
+            svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
             svg.innerHTML = '';
 
+            if (pins.length >= 2) renderArrows(svg, w, h);
+
             pins.forEach(function(pin, i) {
-                var cx = pin.x * wrapper.offsetWidth;
-                var cy = pin.y * wrapper.offsetHeight;
+                var cx = pin.x * w;
+                var cy = pin.y * h;
 
                 var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 g.setAttribute('style', 'cursor:pointer; pointer-events:all;');

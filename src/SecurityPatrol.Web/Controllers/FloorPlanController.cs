@@ -56,13 +56,20 @@ public class FloorPlanController : Controller
 
         if (plan == null) return NotFound();
 
+        var waypoints = await _db.FloorPlanWaypoints
+            .Where(w => w.FloorPlanId == id)
+            .OrderBy(w => w.FromLocationId).ThenBy(w => w.ToLocationId).ThenBy(w => w.OrderIndex)
+            .Select(w => new WaypointDto { FromLocationId = w.FromLocationId, ToLocationId = w.ToLocationId, OrderIndex = w.OrderIndex, X = w.X, Y = w.Y })
+            .ToListAsync();
+
         return View(new FloorPlanViewerViewModel
         {
             FloorPlan = plan,
             Locations = plan.Locations
                 .Where(l => l.IsActive && l.MapX.HasValue && l.MapY.HasValue)
                 .OrderBy(l => l.PatrolOrder).ThenBy(l => l.Name)
-                .ToList()
+                .ToList(),
+            Waypoints = waypoints
         });
     }
 }

@@ -775,7 +775,7 @@ public class AdminController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UploadFloorPlan(int floorId, IFormFile? file, string? label)
+    public async Task<IActionResult> UploadFloorPlan(int floorId, IFormFile? file, string? label, string? returnUrl)
     {
         var allowed = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf" };
         const long maxBytes = 20L * 1024 * 1024;
@@ -826,7 +826,10 @@ public class AdminController : Controller
         await _db.SaveChangesAsync();
 
         TempData["Success"] = "Floor plan uploaded.";
-        return RedirectToAction(nameof(FloorPlanEditor), new { id = plan.Id });
+        var editorUrl = "/Admin/FloorPlanEditor/" + plan.Id;
+        if (!string.IsNullOrEmpty(returnUrl))
+            editorUrl += "?returnUrl=" + System.Net.WebUtility.UrlEncode(returnUrl);
+        return Redirect(editorUrl);
     }
 
     [HttpGet]
@@ -850,11 +853,18 @@ public class AdminController : Controller
             .OrderBy(l => l.PatrolOrder).ThenBy(l => l.Name)
             .ToListAsync();
 
+        var waypoints = await _db.FloorPlanWaypoints
+            .Where(w => w.FloorPlanId == id)
+            .OrderBy(w => w.FromLocationId).ThenBy(w => w.ToLocationId).ThenBy(w => w.OrderIndex)
+            .Select(w => new WaypointDto { FromLocationId = w.FromLocationId, ToLocationId = w.ToLocationId, OrderIndex = w.OrderIndex, X = w.X, Y = w.Y })
+            .ToListAsync();
+
         var vm = new FloorPlanEditorViewModel
         {
             FloorPlan          = plan,
             MappedLocations    = mappedLocations,
-            UnmappedLocations  = unmappedLocations
+            UnmappedLocations  = unmappedLocations,
+            Waypoints          = waypoints
         };
 
         return View(vm);
@@ -972,12 +982,49 @@ public class AdminController : Controller
         var loc = await _db.Locations.FindAsync(request.LocationId)
                   ?? throw new InvalidOperationException("Location not found.");
 
+        var planId = loc.FloorPlanId;
         loc.FloorPlanId = null;
         loc.MapX        = null;
         loc.MapY        = null;
 
+        if (planId.HasValue)
+        {
+            var orphanedWaypoints = await _db.FloorPlanWaypoints
+                .Where(w => w.FloorPlanId == planId.Value
+                         && (w.FromLocationId == request.LocationId || w.ToLocationId == request.LocationId))
+                .ToListAsync();
+            _db.FloorPlanWaypoints.RemoveRange(orphanedWaypoints);
+        }
+
         await _db.SaveChangesAsync();
 
+        return Json(new { success = true });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SaveSegmentWaypoints([FromBody] SaveSegmentWaypointsRequest request)
+    {
+        var existing = await _db.FloorPlanWaypoints
+            .Where(w => w.FloorPlanId == request.FloorPlanId
+                     && w.FromLocationId == request.FromLocationId
+                     && w.ToLocationId == request.ToLocationId)
+            .ToListAsync();
+        _db.FloorPlanWaypoints.RemoveRange(existing);
+
+        for (int i = 0; i < request.Waypoints.Count; i++)
+        {
+            _db.FloorPlanWaypoints.Add(new FloorPlanWaypoint
+            {
+                FloorPlanId    = request.FloorPlanId,
+                FromLocationId = request.FromLocationId,
+                ToLocationId   = request.ToLocationId,
+                OrderIndex     = i,
+                X              = request.Waypoints[i].X,
+                Y              = request.Waypoints[i].Y
+            });
+        }
+
+        await _db.SaveChangesAsync();
         return Json(new { success = true });
     }
 

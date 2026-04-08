@@ -26,12 +26,23 @@ public class FloorPlanEditorViewModel
     public List<Location> UnmappedLocations { get; set; } = new();
     public List<Floor> AllFloors { get; set; } = new();
     public List<Building> AllBuildings { get; set; } = new();
+    public List<WaypointDto> Waypoints { get; set; } = new();
 }
 
 public class FloorPlanViewerViewModel
 {
     public FloorPlan FloorPlan { get; set; } = null!;
     public List<Location> Locations { get; set; } = new();
+    public List<WaypointDto> Waypoints { get; set; } = new();
+}
+
+public class WaypointDto
+{
+    public int FromLocationId { get; set; }
+    public int ToLocationId { get; set; }
+    public int OrderIndex { get; set; }
+    public double X { get; set; }
+    public double Y { get; set; }
 }
 
 // AJAX request/response models
@@ -68,4 +79,18 @@ public class SavePinSizeRequest
 {
     public int FloorPlanId { get; set; }
     public int PinRadius { get; set; }
+}
+
+public class SaveSegmentWaypointsRequest
+{
+    public int FloorPlanId { get; set; }
+    public int FromLocationId { get; set; }
+    public int ToLocationId { get; set; }
+    public List<WaypointXY> Waypoints { get; set; } = new();
+}
+
+public class WaypointXY
+{
+    public double X { get; set; }
+    public double Y { get; set; }
 }

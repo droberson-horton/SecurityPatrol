@@ -118,20 +118,25 @@
                                                 @{
                                                     var floorPlans = floor.FloorPlans.ToList();
                                                 }
+                                                @{
+                                                    var returnUrl = $"/SiteAdmin?open={building.Id}";
+                                                    var encodedReturn = System.Net.WebUtility.UrlEncode(returnUrl);
+                                                }
                                                 @if (floorPlans.Count == 0)
                                                 {
                                                     <button class="btn btn-sm btn-outline-info"
                                                             data-bs-toggle="modal" data-bs-target="#uploadFloorPlanModal"
                                                             data-floorid="@floor.Id"
                                                             data-floorname="@floor.Name"
-                                                            data-buildingname="@building.Name">
+                                                            data-buildingname="@building.Name"
+                                                            data-buildingid="@building.Id">
                                                         <i class="fas fa-map me-1"></i>Floor Plans
                                                     </button>
                                                 }
                                                 else
                                                 {
                                                     var fpUrl = floorPlans.Count == 1
-                                                        ? $"/Admin/FloorPlanEditor/{floorPlans[0].Id}"
+                                                        ? $"/Admin/FloorPlanEditor/{floorPlans[0].Id}?returnUrl={encodedReturn}"
                                                         : "/Admin/FloorPlans";
                                                     <a href="@fpUrl" class="btn btn-sm btn-outline-info">
                                                         <i class="fas fa-map me-1"></i>Floor Plans
@@ -488,6 +493,7 @@
             <form method="post" action="/Admin/UploadFloorPlan" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="floorId" id="uploadFpFloorId" />
+                <input type="hidden" name="returnUrl" id="uploadFpReturnUrl" />
                 <div class="modal-body">
                     <p class="text-muted mb-3">
                         <i class="fas fa-info-circle me-1"></i>
@@ -577,6 +583,8 @@
             document.getElementById('uploadFpFloorId').value = btn.dataset.floorid;
             document.getElementById('uploadFpFloorName').textContent =
                 btn.dataset.floorname + ', ' + btn.dataset.buildingname;
+            document.getElementById('uploadFpReturnUrl').value =
+                '/SiteAdmin?open=' + btn.dataset.buildingid;
         });
 
         // Edit Building Modal

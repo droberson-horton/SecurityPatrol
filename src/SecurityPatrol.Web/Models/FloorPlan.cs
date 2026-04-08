@@ -32,4 +32,5 @@ public class FloorPlan
     public Floor Floor { get; set; } = null!;
 
     public ICollection<Location> Locations { get; set; } = new List<Location>();
+    public ICollection<FloorPlanWaypoint> Waypoints { get; set; } = new List<FloorPlanWaypoint>();
 }

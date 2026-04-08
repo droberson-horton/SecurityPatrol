@@ -20,7 +20,11 @@
         </div>
         <div class="d-flex gap-2">
             @await Html.PartialAsync("_DashboardButton")
-            <a href="javascript:history.back()" class="btn btn-light"><i class="fas fa-arrow-left me-1"></i>Back</a>
+            @{
+                var backUrl = Context.Request.Query["returnUrl"].ToString();
+                if (string.IsNullOrEmpty(backUrl)) backUrl = "javascript:history.back()";
+            }
+            <a href="@backUrl" class="btn btn-light"><i class="fas fa-arrow-left me-1"></i>Back</a>
             <a href="/FloorPlan/View/@Model.FloorPlan.Id" class="btn btn-light" target="_blank"><i class="fas fa-eye me-1"></i>Preview</a>
         </div>
     </div>
@@ -42,6 +46,9 @@
                 </button>
                 <button id="btnModeSelect" class="btn btn-outline-secondary" onclick="setMode('select')">
                     <i class="fas fa-mouse-pointer me-1"></i>Select
+                </button>
+                <button id="btnModeRoute" class="btn btn-outline-success" onclick="setMode('route')">
+                    <i class="fas fa-route me-1"></i>Route
                 </button>
             </div>
         </div>
@@ -190,6 +197,22 @@
             })
         ));
 
+        // ---- Waypoint state ----
+        var segmentWaypoints = {}; // "fromId-toId" -> [{x,y}, ...]
+        var dragWpSegKey = null, dragWpIndex = -1, dragWpMoved = false;
+        (function() {
+            var raw = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Waypoints));
+            raw.forEach(function(w) {
+                var key = w.fromLocationId + '-' + w.toLocationId;
+                if (!segmentWaypoints[key]) segmentWaypoints[key] = [];
+                segmentWaypoints[key][w.orderIndex] = { x: w.x, y: w.y };
+            });
+            // compact sparse arrays
+            Object.keys(segmentWaypoints).forEach(function(k) {
+                segmentWaypoints[k] = segmentWaypoints[k].filter(Boolean);
+            });
+        })();
+
         function getCsrf() {
             var el = document.querySelector('input[name="__RequestVerificationToken"]');
             return el ? el.value : '';
@@ -199,12 +222,151 @@
         var svg = document.getElementById('mapOverlay');
         var wrapper = document.getElementById('mapWrapper');
 
+        // ---- Arrow helpers ----
+        function clipToward(from, to, dist) {
+            var dx = to.x - from.x, dy = to.y - from.y;
+            var len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return { x: from.x, y: from.y };
+            return { x: from.x + dx / len * dist, y: from.y + dy / len * dist };
+        }
+
+        function createArrowDefs() {
+            var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            var marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            marker.setAttribute('id', 'patrol-arrow');
+            marker.setAttribute('viewBox', '0 0 10 8');
+            marker.setAttribute('refX', '9');
+            marker.setAttribute('refY', '4');
+            marker.setAttribute('markerWidth', '10');
+            marker.setAttribute('markerHeight', '8');
+            marker.setAttribute('orient', 'auto');
+            marker.setAttribute('markerUnits', 'userSpaceOnUse');
+            var poly = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            poly.setAttribute('d', 'M 0 0 L 10 4 L 0 8 z');
+            poly.setAttribute('fill', '#0d6efd');
+            marker.appendChild(poly);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+        }
+
+        function renderArrows(w, h) {
+            var arrowOffset = pinRadius + 10;
+            for (var i = 0; i < pins.length - 1; i++) {
+                var pA = pins[i], pB = pins[i + 1];
+                var key = pA.id + '-' + pB.id;
+                var wpts = (segmentWaypoints[key] || []).map(function(wp) {
+                    return { x: wp.x * w, y: wp.y * h };
+                });
+                var all = [{ x: pA.x * w, y: pA.y * h }].concat(wpts).concat([{ x: pB.x * w, y: pB.y * h }]);
+                var pStart = clipToward(all[0], all[1] || all[0], pinRadius + 2);
+                var last = all.length - 1;
+                var pEnd = clipToward(all[last], all[last - 1] || all[last], arrowOffset);
+                var dx = pEnd.x - pStart.x, dy = pEnd.y - pStart.y;
+                if (wpts.length === 0 && Math.sqrt(dx * dx + dy * dy) < 5) continue;
+                var pts = [pStart].concat(wpts).concat([pEnd]);
+                var d = 'M ' + pts.map(function(p) { return p.x.toFixed(1) + ' ' + p.y.toFixed(1); }).join(' L ');
+                var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', d);
+                pathEl.setAttribute('stroke', '#0d6efd');
+                pathEl.setAttribute('stroke-width', '2');
+                pathEl.setAttribute('fill', 'none');
+                pathEl.setAttribute('marker-end', 'url(#patrol-arrow)');
+                pathEl.setAttribute('pointer-events', 'none');
+                svg.appendChild(pathEl);
+            }
+        }
+
+        function renderMidpointGhosts(w, h) {
+            for (var i = 0; i < pins.length - 1; i++) {
+                var pA = pins[i], pB = pins[i + 1];
+                var key = pA.id + '-' + pB.id;
+                var wpts = segmentWaypoints[key] || [];
+                var allNorm = [{ x: pA.x, y: pA.y }].concat(wpts).concat([{ x: pB.x, y: pB.y }]);
+                for (var j = 0; j < allNorm.length - 1; j++) {
+                    (function(segKey, insertIdx, ptA, ptB) {
+                        var mx = (ptA.x + ptB.x) / 2 * w;
+                        var my = (ptA.y + ptB.y) / 2 * h;
+                        var ghost = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        ghost.setAttribute('cx', mx);
+                        ghost.setAttribute('cy', my);
+                        ghost.setAttribute('r', 6);
+                        ghost.setAttribute('fill', 'rgba(13,110,253,0.25)');
+                        ghost.setAttribute('stroke', '#0d6efd');
+                        ghost.setAttribute('stroke-width', '1.5');
+                        ghost.setAttribute('stroke-dasharray', '3 2');
+                        ghost.style.cursor = 'copy';
+                        var t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                        t.textContent = 'Click to add waypoint';
+                        ghost.appendChild(t);
+                        ghost.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            if (!segmentWaypoints[segKey]) segmentWaypoints[segKey] = [];
+                            segmentWaypoints[segKey].splice(insertIdx, 0, {
+                                x: (ptA.x + ptB.x) / 2,
+                                y: (ptA.y + ptB.y) / 2
+                            });
+                            renderPins();
+                            saveSegmentWaypoints(segKey);
+                        });
+                        svg.appendChild(ghost);
+                    })(key, j, allNorm[j], allNorm[j + 1]);
+                }
+            }
+        }
+
+        function renderWaypointHandles(w, h) {
+            for (var i = 0; i < pins.length - 1; i++) {
+                var pA = pins[i], pB = pins[i + 1];
+                var key = pA.id + '-' + pB.id;
+                var wpts = segmentWaypoints[key] || [];
+                wpts.forEach(function(wp, wpIdx) {
+                    (function(segKey, wpIndex) {
+                        var cx = wp.x * w, cy = wp.y * h;
+                        var handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        handle.setAttribute('cx', cx);
+                        handle.setAttribute('cy', cy);
+                        handle.setAttribute('r', 7);
+                        handle.setAttribute('fill', '#fd7e14');
+                        handle.setAttribute('stroke', 'white');
+                        handle.setAttribute('stroke-width', '2');
+                        handle.style.cursor = 'grab';
+                        var t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                        t.textContent = 'Drag to move. Double-click to delete.';
+                        handle.appendChild(t);
+                        handle.addEventListener('mousedown', function(e) {
+                            e.stopPropagation();
+                            dragWpSegKey = segKey;
+                            dragWpIndex = wpIndex;
+                            dragStartX = e.clientX;
+                            dragStartY = e.clientY;
+                        });
+                        handle.addEventListener('dblclick', function(e) {
+                            e.stopPropagation();
+                            segmentWaypoints[segKey].splice(wpIndex, 1);
+                            if (segmentWaypoints[segKey].length === 0) delete segmentWaypoints[segKey];
+                            renderPins();
+                            saveSegmentWaypoints(segKey);
+                        });
+                        svg.appendChild(handle);
+                    })(key, wpIdx);
+                });
+            }
+        }
+
         function renderPins() {
             svg.innerHTML = '';
             var w = wrapper.offsetWidth;
             var h = wrapper.offsetHeight;
             svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
 
+            // Layer 1: arrows
+            createArrowDefs();
+            if (pins.length >= 2) renderArrows(w, h);
+
+            // Layer 2: midpoint ghost handles (before pins so pins render on top)
+            if (mode === 'route' && pins.length >= 2) renderMidpointGhosts(w, h);
+
+            // Layer 3: pins
             pins.forEach(function (pin, i) {
                 var cx = pin.x * w;
                 var cy = pin.y * h;
@@ -243,11 +405,12 @@
 
                 g.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    if (!isDragging) selectPin(pin.id);
+                    if (!isDragging && mode !== 'route') selectPin(pin.id);
                 });
 
                 g.addEventListener('mousedown', function (e) {
                     e.stopPropagation();
+                    if (mode === 'route') return; // don't drag pins in route mode
                     dragPinId = pin.id;
                     dragStartX = e.clientX;
                     dragStartY = e.clientY;
@@ -255,6 +418,9 @@
 
                 svg.appendChild(g);
             });
+
+            // Layer 4: waypoint drag handles (on top of pins)
+            if (mode === 'route' && pins.length >= 2) renderWaypointHandles(w, h);
         }
 
         // ---- Pin size ----
@@ -274,17 +440,29 @@
             }, 600);
         }
 
-        // ---- Drag to move pins ----
+        // ---- Drag to move pins and waypoints ----
         document.addEventListener('mousemove', function (e) {
+            var rect = wrapper.getBoundingClientRect();
+            var x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+            var y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+
+            if (dragWpSegKey !== null) {
+                var dx = Math.abs(e.clientX - dragStartX), dy = Math.abs(e.clientY - dragStartY);
+                if (dx > 4 || dy > 4) {
+                    dragWpMoved = true;
+                    if (segmentWaypoints[dragWpSegKey]) {
+                        segmentWaypoints[dragWpSegKey][dragWpIndex] = { x: x, y: y };
+                        renderPins();
+                    }
+                }
+                return;
+            }
+
             if (dragPinId === null) return;
-            var dx = Math.abs(e.clientX - dragStartX);
-            var dy = Math.abs(e.clientY - dragStartY);
-            if (dx > 4 || dy > 4) {
+            var dx2 = Math.abs(e.clientX - dragStartX), dy2 = Math.abs(e.clientY - dragStartY);
+            if (dx2 > 4 || dy2 > 4) {
                 isDragging = true;
                 dragMoved = true;
-                var rect = wrapper.getBoundingClientRect();
-                var x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-                var y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
                 var pin = pins.find(function (p) { return p.id === dragPinId; });
                 if (pin) { pin.x = x; pin.y = y; }
                 renderPins();
@@ -292,6 +470,13 @@
         });
 
         document.addEventListener('mouseup', function (e) {
+            if (dragWpSegKey !== null) {
+                if (dragWpMoved) saveSegmentWaypoints(dragWpSegKey);
+                dragWpSegKey = null;
+                dragWpIndex = -1;
+                dragWpMoved = false;
+                return;
+            }
             if (dragPinId !== null && dragMoved) {
                 var pin = pins.find(function (p) { return p.id === dragPinId; });
                 if (pin) saveMove(pin.id, pin.x, pin.y);
@@ -339,9 +524,18 @@
             });
             document.getElementById('btnModeAdd').classList.toggle('active', m === 'add');
             document.getElementById('btnModeSelect').classList.toggle('active', m === 'select');
-            document.getElementById('statusMsg').textContent = m === 'add'
-                ? 'Click on map to add a new pin.'
-                : 'Click a pin to select and edit it.';
+            document.getElementById('btnModeRoute').classList.toggle('active', m === 'route');
+            if (m === 'route') {
+                selectedPinId = null;
+                document.getElementById('selectedPanel').classList.add('d-none');
+                document.getElementById('statusMsg').textContent =
+                    'Click ghost circles (\u2295) to add bends. Drag orange handles to reposition. Double-click to delete.';
+            } else {
+                document.getElementById('statusMsg').textContent = m === 'add'
+                    ? 'Click on map to add a new pin.'
+                    : 'Click a pin to select and edit it.';
+            }
+            renderPins();
         }
 
         // ---- Select unmapped location ----
@@ -430,6 +624,10 @@
             var data = await response.json();
             if (data.success) {
                 pins = pins.filter(function (p) { return p.id !== id; });
+                Object.keys(segmentWaypoints).forEach(function(key) {
+                    var parts = key.split('-');
+                    if (parseInt(parts[0]) === id || parseInt(parts[1]) === id) delete segmentWaypoints[key];
+                });
                 selectedPinId = null;
                 document.getElementById('selectedPanel').classList.add('d-none');
                 if (pin) {
@@ -450,6 +648,21 @@
             } else {
                 document.getElementById('statusMsg').textContent = 'Error removing pin.';
             }
+        }
+
+        async function saveSegmentWaypoints(segKey) {
+            var parts = segKey.split('-');
+            var wps = (segmentWaypoints[segKey] || []).filter(Boolean);
+            await fetch('/Admin/SaveSegmentWaypoints', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrf() },
+                body: JSON.stringify({
+                    floorPlanId: floorPlanId,
+                    fromLocationId: parseInt(parts[0]),
+                    toLocationId: parseInt(parts[1]),
+                    waypoints: wps
+                })
+            });
         }
 
         async function saveMove(id, x, y) {

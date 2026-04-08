@@ -21,6 +21,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ScheduleTemplate> ScheduleTemplates { get; set; }
     public DbSet<ScheduleTemplateSlot> ScheduleTemplateSlots { get; set; }
     public DbSet<FloorPlan> FloorPlans { get; set; }
+    public DbSet<FloorPlanWaypoint> FloorPlanWaypoints { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -57,6 +58,19 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany(f => f.FloorPlans)
                 .HasForeignKey(e => e.FloorId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // FloorPlanWaypoint
+        modelBuilder.Entity<FloorPlanWaypoint>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.X).HasColumnType("float");
+            entity.Property(e => e.Y).HasColumnType("float");
+            entity.HasOne(e => e.FloorPlan)
+                .WithMany(fp => fp.Waypoints)
+                .HasForeignKey(e => e.FloorPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => new { e.FloorPlanId, e.FromLocationId, e.ToLocationId, e.OrderIndex });
         });
 
         // Location
