@@ -129,7 +129,7 @@ public class AdminController : Controller
     }
 
     // ---- QR Codes ----
-    public async Task<IActionResult> QrCodes(int? buildingId, int? floorId, int? locationId)
+    public async Task<IActionResult> QrCodes(int? buildingId, int? floorId, int? locationId, bool submitted = false)
     {
         var buildings = await _db.Buildings.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync();
         var floors = buildingId.HasValue
@@ -137,7 +137,7 @@ public class AdminController : Controller
             : new List<Floor>();
         var locations = new List<Location>();
 
-        if (buildingId.HasValue || floorId.HasValue || locationId.HasValue)
+        if (submitted || buildingId.HasValue || floorId.HasValue || locationId.HasValue)
         {
             locations = await _qrCodeService.GetLocationsForPrintAsync(buildingId, floorId, locationId);
         }
@@ -1025,7 +1025,38 @@ public class AdminController : Controller
         }
 
         await _db.SaveChangesAsync();
-        return Json(new { success = true });
+
+        // Verify what actually ended up in the database
+        var savedCount = await _db.FloorPlanWaypoints
+            .Where(w => w.FloorPlanId == request.FloorPlanId
+                     && w.FromLocationId == request.FromLocationId
+                     && w.ToLocationId == request.ToLocationId)
+            .CountAsync();
+
+        _logger.LogInformation(
+            "SaveSegmentWaypoints: plan={PlanId} segment={From}-{To} requested={Req} confirmed={Conf}",
+            request.FloorPlanId, request.FromLocationId, request.ToLocationId,
+            request.Waypoints.Count, savedCount);
+
+        return Json(new { success = true, savedCount });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetWaypoints(int floorPlanId)
+    {
+        var wps = await _db.FloorPlanWaypoints
+            .Where(w => w.FloorPlanId == floorPlanId)
+            .OrderBy(w => w.FromLocationId).ThenBy(w => w.ToLocationId).ThenBy(w => w.OrderIndex)
+            .Select(w => new WaypointDto
+            {
+                FromLocationId = w.FromLocationId,
+                ToLocationId   = w.ToLocationId,
+                OrderIndex     = w.OrderIndex,
+                X              = w.X,
+                Y              = w.Y
+            })
+            .ToListAsync();
+        return Json(wps);
     }
 
     [HttpPost]

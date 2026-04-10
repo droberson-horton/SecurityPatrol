@@ -26,16 +26,23 @@
             }
             <a href="@backUrl" class="btn btn-light"><i class="fas fa-arrow-left me-1"></i>Back</a>
             <a href="/FloorPlan/View/@Model.FloorPlan.Id" class="btn btn-light"><i class="fas fa-eye me-1"></i>Preview</a>
+            <button type="button" class="btn btn-danger" onclick="confirmDeleteFloorPlan()"><i class="fas fa-trash me-1"></i>Delete Floor Plan</button>
+            <form id="deleteFloorPlanForm" action="/Admin/DeleteFloorPlan?id=@Model.FloorPlan.Id" method="post" style="display:none;">
+                @Html.AntiForgeryToken()
+            </form>
         </div>
     </div>
 </div>
 
 <form id="csrfForm" style="display:none;">@Html.AntiForgeryToken()</form>
 
-<div class="d-flex" style="height:calc(100vh - 120px); overflow:hidden;">
+<div id="editorOuter" class="d-flex" style="overflow:hidden;">
 
     <!-- ── Sidebar ── -->
-    <div id="editorSidebar" style="width:280px; min-width:280px; background:#f8f9fa; border-right:1px solid #dee2e6; overflow-y:auto; display:flex; flex-direction:column;">
+    <div id="editorSidebar" style="width:280px; min-width:280px; background:#f8f9fa; border-right:1px solid #dee2e6; display:flex; flex-direction:column; min-height:0;">
+
+    <!-- Scrollable panel content -->
+    <div style="flex:1; overflow-y:auto; min-height:0;">
 
         <!-- Mode toggle -->
         <div class="p-3 border-bottom">
@@ -112,15 +119,30 @@
             <div class="mt-2 small text-muted" id="selectedQr"></div>
         </div>
 
-        <!-- Status bar -->
-        <div class="p-3 mt-auto border-top">
+    </div><!-- /scrollable content -->
+
+        <!-- Status bar — fixed at bottom of sidebar, always visible -->
+        <div class="p-3 border-top" style="flex-shrink:0;">
             <div id="statusMsg" class="small text-muted">Click on the map to add a pin.</div>
         </div>
 
-    </div>
+    </div><!-- /editorSidebar -->
 
     <!-- ── Map area ── -->
-    <div style="flex:1; overflow:auto; background:#e9ecef; padding:16px;">
+    <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; min-height:0;">
+
+        <!-- Zoom toolbar -->
+        <div style="padding:5px 12px; background:#f8f9fa; border-bottom:1px solid #dee2e6; display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <span class="small fw-semibold text-muted me-1">ZOOM</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="zoomOut()" title="Zoom out"><i class="fas fa-minus"></i></button>
+            <span id="zoomLabel" class="small" style="min-width:3.5em; text-align:center;">100%</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="zoomIn()" title="Zoom in"><i class="fas fa-plus"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="zoomReset()" title="Fit to window"><i class="fas fa-compress-arrows-alt"></i></button>
+            <span class="small text-muted ms-2 d-none d-md-inline">Ctrl+Scroll to zoom</span>
+        </div>
+
+        <!-- Scroll area -->
+        <div id="mapScrollContainer" style="flex:1; overflow:auto; background:#e9ecef; padding:16px;">
         <div id="mapWrapper" style="position:relative;">
             @if (Model.FloorPlan.FileType == "pdf")
             {
@@ -134,7 +156,8 @@
             }
             <svg id="mapOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%;"></svg>
         </div>
-    </div>
+        </div><!-- /mapScrollContainer -->
+    </div><!-- /map column -->
 
 </div>
 
@@ -201,7 +224,8 @@
         var segmentWaypoints = {}; // "fromId-toId" -> [{x,y}, ...]
         var dragWpSegKey = null, dragWpIndex = -1, dragWpMoved = false;
         (function() {
-            var raw = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Waypoints));
+            var raw = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Waypoints,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
             raw.forEach(function(w) {
                 var key = w.fromLocationId + '-' + w.toLocationId;
                 if (!segmentWaypoints[key]) segmentWaypoints[key] = [];
@@ -249,6 +273,28 @@
             svg.appendChild(defs);
         }
 
+        // Catmull-Rom spline → cubic Bezier path. Produces smooth curves through all points.
+        // With 2 points it falls back to a straight line.
+        function smoothPath(pts) {
+            if (pts.length < 2) return '';
+            if (pts.length === 2)
+                return 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1) +
+                       ' L ' + pts[1].x.toFixed(1) + ' ' + pts[1].y.toFixed(1);
+            var ps = [pts[0]].concat(pts).concat([pts[pts.length - 1]]);
+            var d = 'M ' + ps[1].x.toFixed(1) + ' ' + ps[1].y.toFixed(1);
+            for (var i = 1; i < ps.length - 2; i++) {
+                var p0 = ps[i - 1], p1 = ps[i], p2 = ps[i + 1], p3 = ps[i + 2];
+                var cp1x = p1.x + (p2.x - p0.x) / 6;
+                var cp1y = p1.y + (p2.y - p0.y) / 6;
+                var cp2x = p2.x - (p3.x - p1.x) / 6;
+                var cp2y = p2.y - (p3.y - p1.y) / 6;
+                d += ' C ' + cp1x.toFixed(1) + ' ' + cp1y.toFixed(1) +
+                     ' ' + cp2x.toFixed(1) + ' ' + cp2y.toFixed(1) +
+                     ' ' + p2.x.toFixed(1) + ' ' + p2.y.toFixed(1);
+            }
+            return d;
+        }
+
         function renderArrows(w, h) {
             var arrowOffset = pinRadius + 10;
             for (var i = 0; i < pins.length - 1; i++) {
@@ -264,9 +310,8 @@
                 var dx = pEnd.x - pStart.x, dy = pEnd.y - pStart.y;
                 if (wpts.length === 0 && Math.sqrt(dx * dx + dy * dy) < 5) continue;
                 var pts = [pStart].concat(wpts).concat([pEnd]);
-                var d = 'M ' + pts.map(function(p) { return p.x.toFixed(1) + ' ' + p.y.toFixed(1); }).join(' L ');
                 var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                pathEl.setAttribute('d', d);
+                pathEl.setAttribute('d', smoothPath(pts));
                 pathEl.setAttribute('stroke', '#0d6efd');
                 pathEl.setAttribute('stroke-width', '2');
                 pathEl.setAttribute('fill', 'none');
@@ -276,7 +321,8 @@
             }
         }
 
-        function renderMidpointGhosts(w, h) {
+        // Transparent wide hit areas over each arrow segment — click anywhere on the line to add a bend.
+        function renderArrowClickTargets(w, h) {
             for (var i = 0; i < pins.length - 1; i++) {
                 var pA = pins[i], pB = pins[i + 1];
                 var key = pA.id + '-' + pB.id;
@@ -284,31 +330,29 @@
                 var allNorm = [{ x: pA.x, y: pA.y }].concat(wpts).concat([{ x: pB.x, y: pB.y }]);
                 for (var j = 0; j < allNorm.length - 1; j++) {
                     (function(segKey, insertIdx, ptA, ptB) {
-                        var mx = (ptA.x + ptB.x) / 2 * w;
-                        var my = (ptA.y + ptB.y) / 2 * h;
-                        var ghost = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        ghost.setAttribute('cx', mx);
-                        ghost.setAttribute('cy', my);
-                        ghost.setAttribute('r', 6);
-                        ghost.setAttribute('fill', 'rgba(13,110,253,0.25)');
-                        ghost.setAttribute('stroke', '#0d6efd');
-                        ghost.setAttribute('stroke-width', '1.5');
-                        ghost.setAttribute('stroke-dasharray', '3 2');
-                        ghost.style.cursor = 'copy';
+                        var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', ptA.x * w);
+                        line.setAttribute('y1', ptA.y * h);
+                        line.setAttribute('x2', ptB.x * w);
+                        line.setAttribute('y2', ptB.y * h);
+                        line.setAttribute('stroke', 'transparent');
+                        line.setAttribute('stroke-width', '14');
+                        line.setAttribute('pointer-events', 'stroke');
+                        line.style.cursor = 'copy';
                         var t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                        t.textContent = 'Click to add waypoint';
-                        ghost.appendChild(t);
-                        ghost.addEventListener('click', function(e) {
+                        t.textContent = 'Click to add bend point';
+                        line.appendChild(t);
+                        line.addEventListener('click', function(e) {
                             e.stopPropagation();
+                            var rect = wrapper.getBoundingClientRect();
+                            var nx = (e.clientX - rect.left) / rect.width;
+                            var ny = (e.clientY - rect.top) / rect.height;
                             if (!segmentWaypoints[segKey]) segmentWaypoints[segKey] = [];
-                            segmentWaypoints[segKey].splice(insertIdx, 0, {
-                                x: (ptA.x + ptB.x) / 2,
-                                y: (ptA.y + ptB.y) / 2
-                            });
+                            segmentWaypoints[segKey].splice(insertIdx, 0, { x: nx, y: ny });
                             renderPins();
                             saveSegmentWaypoints(segKey);
                         });
-                        svg.appendChild(ghost);
+                        svg.appendChild(line);
                     })(key, j, allNorm[j], allNorm[j + 1]);
                 }
             }
@@ -340,6 +384,9 @@
                             dragStartX = e.clientX;
                             dragStartY = e.clientY;
                         });
+                        handle.addEventListener('click', function(e) {
+                            e.stopPropagation(); // prevent SVG background click from calling renderPins() mid-dblclick
+                        });
                         handle.addEventListener('dblclick', function(e) {
                             e.stopPropagation();
                             segmentWaypoints[segKey].splice(wpIndex, 1);
@@ -363,10 +410,7 @@
             createArrowDefs();
             if (pins.length >= 2) renderArrows(w, h);
 
-            // Layer 2: midpoint ghost handles (before pins so pins render on top)
-            if (mode === 'route' && pins.length >= 2) renderMidpointGhosts(w, h);
-
-            // Layer 3: pins
+            // Layer 2: pins
             pins.forEach(function (pin, i) {
                 var cx = pin.x * w;
                 var cy = pin.y * h;
@@ -419,7 +463,10 @@
                 svg.appendChild(g);
             });
 
-            // Layer 4: waypoint drag handles (on top of pins)
+            // Layer 3: arrow click targets (on top of pins so route-mode clicks register)
+            if (mode === 'route' && pins.length >= 2) renderArrowClickTargets(w, h);
+
+            // Layer 4: waypoint drag handles (topmost so they're always draggable)
             if (mode === 'route' && pins.length >= 2) renderWaypointHandles(w, h);
         }
 
@@ -529,7 +576,7 @@
                 selectedPinId = null;
                 document.getElementById('selectedPanel').classList.add('d-none');
                 document.getElementById('statusMsg').textContent =
-                    'Click ghost circles (\u2295) to add bends. Drag orange handles to reposition. Double-click to delete.';
+                    'Click anywhere on an arrow to add a bend. Drag orange handles to reposition. Double-click a handle to remove it.';
             } else {
                 document.getElementById('statusMsg').textContent = m === 'add'
                     ? 'Click on map to add a new pin.'
@@ -650,20 +697,113 @@
             }
         }
 
+        var dirtySegments = new Set();
+        var saveStatusTimer = null;
+
+        function setSaveStatus(msg, cssClass) {
+            var el = document.getElementById('statusMsg');
+            el.textContent = msg;
+            el.className = 'small ' + cssClass;
+            clearTimeout(saveStatusTimer);
+            if (cssClass === 'text-success') {
+                saveStatusTimer = setTimeout(function() {
+                    el.textContent = 'Route mode: click arrow to add bend, drag handle to move, double-click to delete.';
+                    el.className = 'small text-muted';
+                }, 2000);
+            }
+        }
+
         async function saveSegmentWaypoints(segKey) {
             var parts = segKey.split('-');
             var wps = (segmentWaypoints[segKey] || []).filter(Boolean);
-            await fetch('/Admin/SaveSegmentWaypoints', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrf() },
-                body: JSON.stringify({
-                    floorPlanId: floorPlanId,
-                    fromLocationId: parseInt(parts[0]),
-                    toLocationId: parseInt(parts[1]),
-                    waypoints: wps
-                })
+            var payload = {
+                floorPlanId: floorPlanId,
+                fromLocationId: parseInt(parts[0]),
+                toLocationId: parseInt(parts[1]),
+                waypoints: wps
+            };
+            var body = JSON.stringify(payload);
+            console.log('[SP] saveSegmentWaypoints SENDING', payload);
+            dirtySegments.add(segKey);
+            setSaveStatus('Saving route...', 'text-muted');
+            try {
+                var resp = await fetch('/Admin/SaveSegmentWaypoints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrf() },
+                    body: body,
+                    keepalive: true
+                });
+                if (resp.ok) {
+                    var data = await resp.json();
+                    console.log('[SP] saveSegmentWaypoints RESPONSE', data);
+                    if (data.success) {
+                        dirtySegments.delete(segKey);
+                        setSaveStatus('Route saved (' + data.savedCount + ' bends).', 'text-success');
+                        // Verify DB immediately
+                        verifyWaypoints();
+                    } else {
+                        setSaveStatus('Server returned failure. Check console.', 'text-danger');
+                        console.error('[SP] saveSegmentWaypoints: success=false', data);
+                    }
+                } else {
+                    setSaveStatus('Save failed (HTTP ' + resp.status + '). Check console.', 'text-danger');
+                    console.error('[SP] SaveSegmentWaypoints HTTP error', resp.status, await resp.text());
+                }
+            } catch (e) {
+                setSaveStatus('Save failed: ' + e.message, 'text-danger');
+                console.error('[SP] SaveSegmentWaypoints exception', e);
+            }
+        }
+
+        async function verifyWaypoints() {
+            try {
+                var resp = await fetch('/Admin/GetWaypoints?floorPlanId=' + floorPlanId);
+                var data = await resp.json();
+                console.log('[SP] DB contains ' + data.length + ' waypoints for floorPlanId=' + floorPlanId + ':', data);
+            } catch (e) {
+                console.warn('[SP] verifyWaypoints failed', e);
+            }
+        }
+
+        function buildSegmentBody(segKey) {
+            var parts = segKey.split('-');
+            var wps = (segmentWaypoints[segKey] || []).filter(Boolean);
+            return JSON.stringify({
+                floorPlanId: floorPlanId,
+                fromLocationId: parseInt(parts[0]),
+                toLocationId: parseInt(parts[1]),
+                waypoints: wps
             });
         }
+
+        function flushDirtySegments() {
+            // Include any in-progress drag that never completed
+            if (dragWpSegKey !== null && dragWpMoved) dirtySegments.add(dragWpSegKey);
+            if (!dirtySegments.size) return;
+            dirtySegments.forEach(function(segKey) {
+                // sendBeacon: browser-guaranteed delivery even during page unload.
+                // No CSRF header needed — endpoint has no [ValidateAntiForgeryToken].
+                // Same-origin → auth cookie is automatically included.
+                var sent = navigator.sendBeacon(
+                    '/Admin/SaveSegmentWaypoints',
+                    new Blob([buildSegmentBody(segKey)], { type: 'application/json' })
+                );
+                if (!sent) {
+                    // Payload too large for sendBeacon; fall back to keepalive fetch
+                    fetch('/Admin/SaveSegmentWaypoints', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrf() },
+                        body: buildSegmentBody(segKey),
+                        keepalive: true
+                    });
+                }
+            });
+        }
+
+        window.addEventListener('beforeunload', flushDirtySegments);
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') flushDirtySegments();
+        });
 
         async function saveMove(id, x, y) {
             await fetch('/Admin/MoveMapPin', {
@@ -738,7 +878,61 @@
             </text>
         }
 
-        // Re-render on window resize so pin positions stay accurate
-        window.addEventListener('resize', renderPins);
+        // ---- Zoom ----
+        var zoomLevel = 1.0;
+        var mapScrollContainer = document.getElementById('mapScrollContainer');
+
+        function applyZoom(newZoom) {
+            newZoom = Math.round(Math.min(5.0, Math.max(0.5, newZoom)) * 20) / 20;
+            zoomLevel = newZoom;
+            var baseWidth = mapScrollContainer.clientWidth - 32; // 16px padding each side
+            wrapper.style.width = Math.round(baseWidth * zoomLevel) + 'px';
+            document.getElementById('zoomLabel').textContent = Math.round(zoomLevel * 100) + '%';
+            renderPins();
+        }
+
+        function zoomIn()    { applyZoom(zoomLevel + 0.25); }
+        function zoomOut()   { applyZoom(zoomLevel - 0.25); }
+        function zoomReset() { applyZoom(1.0); }
+
+        // Ctrl+Scroll: zoom toward cursor position
+        mapScrollContainer.addEventListener('wheel', function(e) {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            var delta = e.deltaY < 0 ? 0.25 : -0.25;
+            var containerRect = mapScrollContainer.getBoundingClientRect();
+            var mouseContentX = e.clientX - containerRect.left + mapScrollContainer.scrollLeft;
+            var mouseContentY = e.clientY - containerRect.top  + mapScrollContainer.scrollTop;
+            var oldWidth  = wrapper.offsetWidth;
+            var oldHeight = wrapper.offsetHeight;
+            applyZoom(zoomLevel + delta);
+            var newWidth  = wrapper.offsetWidth;
+            if (newWidth !== oldWidth) {
+                var scale = newWidth / oldWidth;
+                mapScrollContainer.scrollLeft = mouseContentX * scale - (e.clientX - containerRect.left);
+                mapScrollContainer.scrollTop  = mouseContentY * scale - (e.clientY - containerRect.top);
+            }
+        }, { passive: false });
+
+        // Size the editor to exactly fill the remaining viewport below the page headers
+        (function() {
+            var outer = document.getElementById('editorOuter');
+            function fitEditor() {
+                outer.style.height = (window.innerHeight - outer.getBoundingClientRect().top) + 'px';
+            }
+            fitEditor();
+            window.addEventListener('resize', fitEditor);
+        })();
+
+        // Re-render on window resize; reapply zoom to keep wrapper width in sync
+        window.addEventListener('resize', function() {
+            if (zoomLevel > 1.0) applyZoom(zoomLevel); else renderPins();
+        });
+
+        function confirmDeleteFloorPlan() {
+            if (confirm('Delete this floor plan? This will remove it and unpin all locations from it. This cannot be undone.')) {
+                document.getElementById('deleteFloorPlanForm').submit();
+            }
+        }
     </script>
 }

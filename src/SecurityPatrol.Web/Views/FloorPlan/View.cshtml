@@ -116,7 +116,8 @@
 
         var segmentWaypoints = {};
         (function() {
-            var raw = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Waypoints));
+            var raw = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Waypoints,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
             raw.forEach(function(w) {
                 var key = w.fromLocationId + '-' + w.toLocationId;
                 if (!segmentWaypoints[key]) segmentWaypoints[key] = [];
@@ -132,6 +133,26 @@
             var len = Math.sqrt(dx * dx + dy * dy);
             if (len < 1) return { x: from.x, y: from.y };
             return { x: from.x + dx / len * dist, y: from.y + dy / len * dist };
+        }
+
+        function smoothPath(pts) {
+            if (pts.length < 2) return '';
+            if (pts.length === 2)
+                return 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1) +
+                       ' L ' + pts[1].x.toFixed(1) + ' ' + pts[1].y.toFixed(1);
+            var ps = [pts[0]].concat(pts).concat([pts[pts.length - 1]]);
+            var d = 'M ' + ps[1].x.toFixed(1) + ' ' + ps[1].y.toFixed(1);
+            for (var i = 1; i < ps.length - 2; i++) {
+                var p0 = ps[i - 1], p1 = ps[i], p2 = ps[i + 1], p3 = ps[i + 2];
+                var cp1x = p1.x + (p2.x - p0.x) / 6;
+                var cp1y = p1.y + (p2.y - p0.y) / 6;
+                var cp2x = p2.x - (p3.x - p1.x) / 6;
+                var cp2y = p2.y - (p3.y - p1.y) / 6;
+                d += ' C ' + cp1x.toFixed(1) + ' ' + cp1y.toFixed(1) +
+                     ' ' + cp2x.toFixed(1) + ' ' + cp2y.toFixed(1) +
+                     ' ' + p2.x.toFixed(1) + ' ' + p2.y.toFixed(1);
+            }
+            return d;
         }
 
         function renderArrows(svg, w, h) {
@@ -166,9 +187,8 @@
                 var dx = pEnd.x - pStart.x, dy = pEnd.y - pStart.y;
                 if (wpts.length === 0 && Math.sqrt(dx * dx + dy * dy) < 5) continue;
                 var pts = [pStart].concat(wpts).concat([pEnd]);
-                var d = 'M ' + pts.map(function(p) { return p.x.toFixed(1) + ' ' + p.y.toFixed(1); }).join(' L ');
                 var pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                pathEl.setAttribute('d', d);
+                pathEl.setAttribute('d', smoothPath(pts));
                 pathEl.setAttribute('stroke', '#0d6efd');
                 pathEl.setAttribute('stroke-width', '2');
                 pathEl.setAttribute('fill', 'none');
